@@ -1,0 +1,4 @@
+/build/
+/submission.cpp
+__pycache__/
+*.py[cod]

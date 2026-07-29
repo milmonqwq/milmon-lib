@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "umbrella_headers": ["milmon/all.hpp"],
+  "modules": {
+    "types": {
+      "header": "include/milmon/types.hpp",
+      "symbols": ["u32", "u64", "i32", "i64", "ll", "ull", "u128", "i128"],
+      "depends": []
+    },
+    "basic": {
+      "header": "include/milmon/basic.hpp",
+      "symbols": ["endl", "init_io"],
+      "depends": []
+    },
+    "debug": {
+      "header": "include/milmon/debug.hpp",
+      "symbols": ["debug"],
+      "depends": []
+    },
+    "dsu": {
+      "header": "include/milmon/ds/dsu.hpp",
+      "symbols": ["DSU"],
+      "depends": []
+    },
+    "fenwick": {
+      "header": "include/milmon/ds/fenwick.hpp",
+      "symbols": ["Fenwick"],
+      "depends": []
+    },
+    "rmq": {
+      "header": "include/milmon/ds/rmq.hpp",
+      "symbols": ["RMQ"],
+      "depends": []
+    },
+    "suffix_array": {
+      "header": "include/milmon/string/suffix_array.hpp",
+      "symbols": ["SuffixArray", "SA", "build_sa", "build_rnk"],
+      "depends": ["rmq"]
+    },
+    "kmp": {
+      "header": "include/milmon/string/kmp.hpp",
+      "symbols": ["kmp", "prefix_function"],
+      "depends": []
+    },
+    "lyndon": {
+      "header": "include/milmon/string/lyndon.hpp",
+      "symbols": ["build_lyndon"],
+      "depends": []
+    },
+    "manacher": {
+      "header": "include/milmon/string/manacher.hpp",
+      "symbols": ["manacher"],
+      "depends": []
+    },
+    "z_function": {
+      "header": "include/milmon/string/z_function.hpp",
+      "symbols": ["z_function"],
+      "depends": []
+    },
+    "fast_io": {
+      "header": "include/milmon/fast_io.hpp",
+      "symbols": ["FastScanner", "FastOutput"],
+      "depends": []
+    },
+    "primality": {
+      "header": "include/milmon/math/primality.hpp",
+      "symbols": ["is_prime"],
+      "depends": ["types"]
+    },
+    "pollard_rho": {
+      "header": "include/milmon/math/pollard_rho.hpp",
+      "symbols": ["pollard_rho", "factorize"],
+      "depends": ["primality"]
+    }
+  }
+}
