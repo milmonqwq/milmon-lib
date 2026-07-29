@@ -136,20 +136,22 @@ def code_without_comments_and_literals(source: str) -> str:
     index = 0
     length = len(source)
     while index < length:
-        if source.startswith("//", index):
-            end = source.find("\n", index + 2)
-            end = length if end == -1 else end
-            blank_range(characters, index, end)
-            index = end
-            continue
-        if source.startswith("/*", index):
-            closing = source.find("*/", index + 2)
-            end = length if closing == -1 else closing + 2
-            blank_range(characters, index, end)
-            index = end
-            continue
+        character = source[index]
+        if character == "/" and index + 1 < length:
+            if source[index + 1] == "/":
+                end = source.find("\n", index + 2)
+                end = length if end == -1 else end
+                blank_range(characters, index, end)
+                index = end
+                continue
+            if source[index + 1] == "*":
+                closing = source.find("*/", index + 2)
+                end = length if closing == -1 else closing + 2
+                blank_range(characters, index, end)
+                index = end
+                continue
 
-        raw_match = RAW_STRING_RE.match(source, index)
+        raw_match = RAW_STRING_RE.match(source, index) if character in "RuUL" else None
         if raw_match:
             terminator = ")" + raw_match.group("delimiter") + '"'
             closing = source.find(terminator, raw_match.end())
@@ -158,7 +160,11 @@ def code_without_comments_and_literals(source: str) -> str:
             index = end
             continue
 
-        quoted_match = QUOTED_LITERAL_RE.match(source, index)
+        quoted_match = (
+            QUOTED_LITERAL_RE.match(source, index)
+            if character in "\"'uUL"
+            else None
+        )
         if quoted_match:
             quote = quoted_match.group("quote")
             cursor = quoted_match.end()
@@ -177,8 +183,11 @@ def code_without_comments_and_literals(source: str) -> str:
     return "".join(characters)
 
 
-def active_include_starts(source: str, pattern: re.Pattern[str]) -> set[int]:
-    code = code_without_comments_and_literals(source)
+def active_include_starts(
+    source: str, pattern: re.Pattern[str], code: str | None = None
+) -> set[int]:
+    if code is None:
+        code = code_without_comments_and_literals(source)
     return {
         match.start()
         for match in pattern.finditer(source)
@@ -193,8 +202,10 @@ def split_module_names(values: Iterable[str]) -> set[str]:
     return names
 
 
-def has_managed_include(source: str, library: Library) -> bool:
-    active = active_include_starts(source, INCLUDE_RE)
+def has_managed_include(
+    source: str, library: Library, code: str | None = None
+) -> bool:
+    active = active_include_starts(source, INCLUDE_RE, code)
     return any(
         match.start() in active
         and (
@@ -206,9 +217,14 @@ def has_managed_include(source: str, library: Library) -> bool:
 
 
 def resolve_modules(
-    source: str, library: Library, required_by_cli: Sequence[str]
+    source: str,
+    library: Library,
+    required_by_cli: Sequence[str],
+    code: str | None = None,
 ) -> tuple[list[Module], dict[str, set[str]]]:
-    active = active_include_starts(source, INCLUDE_RE)
+    if code is None:
+        code = code_without_comments_and_literals(source)
+    active = active_include_starts(source, INCLUDE_RE, code)
     includes = [match for match in INCLUDE_RE.finditer(source) if match.start() in active]
     managed_includes = [
         match
@@ -244,7 +260,6 @@ def resolve_modules(
         select(name, "command line")
 
     if has_umbrella:
-        code = code_without_comments_and_literals(source)
         identifiers = set(IDENTIFIER_RE.findall(code))
         for module in library.modules.values():
             matched = identifiers.intersection(module.symbols)
@@ -291,10 +306,12 @@ def resolve_modules(
 
 
 def remove_standard_includes(
-    source: str, excluded: frozenset[str] = frozenset()
+    source: str,
+    excluded: frozenset[str] = frozenset(),
+    code: str | None = None,
 ) -> tuple[str, list[str]]:
     headers: list[str] = []
-    active = active_include_starts(source, STANDARD_INCLUDE_RE)
+    active = active_include_starts(source, STANDARD_INCLUDE_RE, code)
 
     def replace(match: re.Match[str]) -> str:
         if match.start() not in active:
@@ -355,30 +372,43 @@ def render_bundle(
     return "\n".join(sections), headers
 
 
-def replace_managed_includes(source: str, library: Library, bundle: str) -> str:
+def rewrite_source_includes(
+    source: str, library: Library, bundle: str, code: str
+) -> tuple[str, list[str]]:
     inserted = False
-    active = active_include_starts(source, INCLUDE_RE)
+    headers: list[str] = []
+    active = active_include_starts(source, INCLUDE_RE, code)
+    standard = active_include_starts(source, STANDARD_INCLUDE_RE, code)
 
     def replace(match: re.Match[str]) -> str:
         nonlocal inserted
         if match.start() not in active:
             return match.group(0)
         header = match.group("header")
-        if header not in library.umbrella_headers and header not in library.direct_headers:
-            return match.group(0)
-        if inserted:
+        if header in library.umbrella_headers or header in library.direct_headers:
+            if inserted:
+                return ""
+            inserted = True
+            return bundle
+        if match.start() in standard:
+            headers.append(header.strip())
             return ""
-        inserted = True
-        return bundle
+        return match.group(0)
 
-    return INCLUDE_RE.sub(replace, source)
+    return INCLUDE_RE.sub(replace, source), headers
 
 
-def render_output(source: str, modules: Sequence[Module], library: Library) -> str:
-    excluded = library.umbrella_headers | frozenset(library.direct_headers)
-    source, source_headers = remove_standard_includes(source, excluded)
+def render_output(
+    source: str,
+    modules: Sequence[Module],
+    library: Library,
+    code: str | None = None,
+) -> str:
+    if code is None:
+        code = code_without_comments_and_literals(source)
     bundle, module_headers = render_bundle(modules, library)
-    body = replace_managed_includes(source, library, bundle).lstrip("\r\n")
+    body, source_headers = rewrite_source_includes(source, library, bundle, code)
+    body = body.lstrip("\r\n")
 
     headers: list[str] = []
     seen: set[str] = set()
@@ -436,9 +466,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         except OSError as error:
             raise BundleError(f"cannot read {source_path}: {error}") from error
 
-        managed = has_managed_include(source, library)
-        modules, reasons = resolve_modules(source, library, arguments.require)
-        output = render_output(source, modules, library) if managed else source
+        code = code_without_comments_and_literals(source)
+        managed = has_managed_include(source, library, code)
+        modules, reasons = resolve_modules(source, library, arguments.require, code)
+        output = render_output(source, modules, library, code) if managed else source
 
         if arguments.output is None:
             sys.stdout.write(output)

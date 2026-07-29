@@ -71,6 +71,7 @@ void test_pollard_rho() {
     assert(cp::factorize(0).empty());
     assert(cp::factorize(1).empty());
     assert((cp::factorize(360) == std::vector<u64>{2, 2, 2, 3, 3, 5}));
+    assert(cp::factorize(1ULL << 63U) == std::vector<u64>(63, 2));
 
     constexpr u64 first_prime = 1000000007ULL;
     constexpr u64 second_prime = 1000000009ULL;

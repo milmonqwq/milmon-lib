@@ -8,6 +8,8 @@
 namespace cp {
 namespace detail {
 
+inline constexpr u64 small_primes[] = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37};
+
 inline u64 mul_mod(u64 a, u64 b, u64 mod) { return u64(u128(a) * b % mod); }
 
 inline u64 pow_mod(u64 a, u64 e, u64 mod) {
@@ -22,8 +24,7 @@ inline u64 pow_mod(u64 a, u64 e, u64 mod) {
 
 inline bool is_prime_u64(u64 n) {
     if (n < 2) return false;
-    for (u64 p : {2ULL, 3ULL, 5ULL, 7ULL, 11ULL, 13ULL, 17ULL,
-                  19ULL, 23ULL, 29ULL, 31ULL, 37ULL}) {
+    for (u64 p : small_primes) {
         if (n % p == 0) return n == p;
     }
     const int s = __builtin_ctzll(n - 1);

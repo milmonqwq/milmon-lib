@@ -164,7 +164,7 @@ inline void radix_sort_runs(std::vector<std::array<int, 3>>& a, int n) {
 
 inline std::vector<int> build_sa(const std::string& s) { return detail::sa_is(detail::string_symbols(s), 255); }
 
-inline std::vector<int> build_sa(std::vector<int> s, int upper) { return detail::sa_is(s, upper); }
+inline std::vector<int> build_sa(const std::vector<int>& s, int upper) { return detail::sa_is(s, upper); }
 
 inline std::vector<int> build_sa(const std::vector<int>& s) {
     int upper = 0;
@@ -172,8 +172,8 @@ inline std::vector<int> build_sa(const std::vector<int>& s) {
     return detail::sa_is(a, upper);
 }
 
-inline std::vector<int> build_rnk(std::vector<int> s, int upper) {
-    return detail::ranks_from_sa(build_sa(std::move(s), upper));
+inline std::vector<int> build_rnk(const std::vector<int>& s, int upper) {
+    return detail::ranks_from_sa(build_sa(s, upper));
 }
 
 inline std::vector<int> build_rnk(const std::string& s) { return detail::ranks_from_sa(build_sa(s)); }
