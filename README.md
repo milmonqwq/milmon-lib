@@ -44,7 +44,13 @@ include/milmon/
 │   ├── dsu.hpp
 │   ├── fenwick.hpp
 │   └── rmq.hpp
+├── geometry/
+│   ├── convex_hull.hpp
+│   ├── p2.hpp
+│   └── p2r.hpp
 ├── math/
+│   ├── exgcd.hpp
+│   ├── floor_sum.hpp
 │   ├── primality.hpp
 │   └── pollard_rho.hpp
 ├── string/
@@ -67,11 +73,12 @@ i32 signed_32;
 i64 signed_64;
 ll signed_64_short;
 ull unsigned_64_short;
+ld real_extended;
 u128 unsigned_128;
 i128 signed_128;
 ```
 
-其中 `u32/u64` 分别对应 `std::uint32_t/std::uint64_t`，`i32/i64` 分别对应 `int/long long`；`ll/ull` 分别是 `long long/u64` 的简写。
+其中 `u32/u64` 分别对应 `std::uint32_t/std::uint64_t`，`i32/i64` 分别对应 `int/long long`；`ll/ull` 分别是 `long long/u64` 的简写，`ld` 是 `long double` 的简写。
 
 ### 基础 I/O 设置
 
@@ -108,6 +115,23 @@ bool prime = cp::is_prime(value);
 ```
 
 实现是确定性的 64 位 Miller–Rabin，支持所有不超过 64 位的有符号或无符号整数；负数返回 `false`。乘法取模使用竞赛环境中常见的 GCC/Clang `unsigned __int128`。
+
+### 扩展欧几里得算法
+
+```cpp
+long long x, y;
+long long g = cp::exgcd(a, b, x, y);
+```
+
+返回非负的 `gcd(a, b)`，并通过 `x`、`y` 给出一组满足 `a*x+b*y=g` 的贝祖系数。参数类型需一致且为有符号整数，支持 `int` 和 `long long`；`a=b=0` 时返回 `0`。
+
+### 整除分块求和
+
+```cpp
+i64 sum = cp::floor_sum(n, m, a, b);
+```
+
+计算 `0 <= i < n` 时 `floor((a*i+b)/m)` 的总和，时间复杂度为 O(log m)。要求 `n >= 0`、`m > 0` 且答案能用 `i64` 表示；`a`、`b` 可以为负数。
 
 ### Pollard–Rho 分解
 
@@ -162,6 +186,25 @@ i64 prefix = sums.prefix_sum(right); // sum(values[0..right))
 ```cpp
 cp::Fenwick<i64> sums(values);
 ```
+
+### 二维几何
+
+```cpp
+cp::p2 a{1, 2}, b{3, 4};
+cp::p2 sum = a + b;
+long long inner = cp::dot(a, b);
+long long area2 = cp::cross(a, b);
+
+cp::p2r<double> u{1.5, 2.0}, v{3.0, 4.5};
+cp::p2r<double> midpoint = (u + v) / 2;
+double real_area2 = cp::cross(u, v);
+
+std::vector<cp::p2> hull = cp::convex_hull(points);
+```
+
+`p2` 包含两个 `int` 成员 `x`、`y`；`p2r<T>` 是对应的实数模板，`T` 可以使用 `double` 或 `long double`。两者都支持比较、向量加减、取负、数乘以及对应的复合赋值，`p2r<T>` 还支持除法。`dot(a, b)` 和 `cross(a, b)` 分别计算点积和叉积；`cross(o, a, b)` 计算向量 `a-o` 与 `b-o` 的叉积。
+
+`convex_hull` 使用单调链算法，时间复杂度为 O(n log n)。输入点可以无序或重复；返回结果从字典序最小点开始逆时针排列，不重复首点，并移除凸包边上的共线中间点。少于两个不同点时直接返回去重后的结果。
 
 ### KMP
 

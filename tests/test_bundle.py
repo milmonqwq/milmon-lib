@@ -182,6 +182,36 @@ class BundleTests(unittest.TestCase):
             )
             self.assertEqual(run_result.returncode, 0, run_result.stderr)
 
+    def test_math_helpers_are_selected_and_compile(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "main.cpp"
+            submission = Path(directory) / "submission.cpp"
+            executable = Path(directory) / "submission"
+            source.write_text(
+                "#include <milmon/all.hpp>\n"
+                "int main() { long long x, y; auto g = cp::exgcd(30LL, 18LL, x, y); "
+                "auto s = cp::floor_sum(4, 10, 6, 3); "
+                "return g != 6 || 30 * x + 18 * y != g || s != 3; }\n",
+                encoding="utf-8",
+            )
+            result = self.run_bundle(source, "-o", str(submission), "--explain")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("selected types, exgcd, floor_sum", result.stderr)
+            bundled = submission.read_text(encoding="utf-8")
+            self.assertIn("inline T exgcd", bundled)
+            self.assertIn("inline i64 floor_sum", bundled)
+            compile_result = subprocess.run(
+                ["g++", "-std=c++17", "-O2", str(submission), "-o", str(executable)],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(compile_result.returncode, 0, compile_result.stderr)
+            run_result = subprocess.run(
+                [str(executable)], text=True, capture_output=True, check=False
+            )
+            self.assertEqual(run_result.returncode, 0, run_result.stderr)
+
     def test_fenwick_and_global_alias_are_selected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "main.cpp"
@@ -214,6 +244,63 @@ class BundleTests(unittest.TestCase):
             self.assertIn("class RMQ", result.stdout)
             self.assertNotIn("class DSU", result.stdout)
             submission.write_text(result.stdout, encoding="utf-8")
+            compile_result = subprocess.run(
+                ["g++", "-std=c++17", "-O2", str(submission), "-o", str(executable)],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(compile_result.returncode, 0, compile_result.stderr)
+            run_result = subprocess.run(
+                [str(executable)], text=True, capture_output=True, check=False
+            )
+            self.assertEqual(run_result.returncode, 0, run_result.stderr)
+
+    def test_convex_hull_pulls_point_type_and_compiles(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "main.cpp"
+            submission = Path(directory) / "submission.cpp"
+            executable = Path(directory) / "submission"
+            source.write_text(
+                "#include <milmon/all.hpp>\n"
+                "int main() { auto h = cp::convex_hull({{0, 0}, {2, 0}, "
+                "{1, 1}, {1, 0}}); return h.size() != 3; }\n",
+                encoding="utf-8",
+            )
+            result = self.run_bundle(source, "-o", str(submission), "--explain")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("selected p2, convex_hull", result.stderr)
+            bundled = submission.read_text(encoding="utf-8")
+            self.assertLess(bundled.index("struct p2"), bundled.index("convex_hull"))
+            compile_result = subprocess.run(
+                ["g++", "-std=c++17", "-O2", str(submission), "-o", str(executable)],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(compile_result.returncode, 0, compile_result.stderr)
+            run_result = subprocess.run(
+                [str(executable)], text=True, capture_output=True, check=False
+            )
+            self.assertEqual(run_result.returncode, 0, run_result.stderr)
+
+    def test_real_point_and_long_double_alias_are_bundled(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "main.cpp"
+            submission = Path(directory) / "submission.cpp"
+            executable = Path(directory) / "submission"
+            source.write_text(
+                "#include <milmon/all.hpp>\n"
+                "int main() { cp::p2r<ld> a{1, 2}, b{3, 4}; "
+                "return cp::cross(a, b) != -2; }\n",
+                encoding="utf-8",
+            )
+            result = self.run_bundle(source, "-o", str(submission), "--explain")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("selected types, p2r", result.stderr)
+            bundled = submission.read_text(encoding="utf-8")
+            self.assertIn("using ld = long double", bundled)
+            self.assertIn("struct p2r", bundled)
             compile_result = subprocess.run(
                 ["g++", "-std=c++17", "-O2", str(submission), "-o", str(executable)],
                 text=True,

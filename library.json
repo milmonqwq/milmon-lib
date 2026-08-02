@@ -4,7 +4,7 @@
   "modules": {
     "types": {
       "header": "include/milmon/types.hpp",
-      "symbols": ["u32", "u64", "i32", "i64", "ll", "ull", "u128", "i128"],
+      "symbols": ["u32", "u64", "i32", "i64", "ll", "ull", "ld", "u128", "i128"],
       "depends": []
     },
     "basic": {
@@ -31,6 +31,21 @@
       "header": "include/milmon/ds/rmq.hpp",
       "symbols": ["RMQ"],
       "depends": []
+    },
+    "p2": {
+      "header": "include/milmon/geometry/p2.hpp",
+      "symbols": ["p2"],
+      "depends": []
+    },
+    "p2r": {
+      "header": "include/milmon/geometry/p2r.hpp",
+      "symbols": ["p2r"],
+      "depends": []
+    },
+    "convex_hull": {
+      "header": "include/milmon/geometry/convex_hull.hpp",
+      "symbols": ["convex_hull"],
+      "depends": ["p2"]
     },
     "suffix_array": {
       "header": "include/milmon/string/suffix_array.hpp",
@@ -61,6 +76,16 @@
       "header": "include/milmon/fast_io.hpp",
       "symbols": ["FastScanner", "FastOutput"],
       "depends": []
+    },
+    "exgcd": {
+      "header": "include/milmon/math/exgcd.hpp",
+      "symbols": ["exgcd"],
+      "depends": []
+    },
+    "floor_sum": {
+      "header": "include/milmon/math/floor_sum.hpp",
+      "symbols": ["floor_sum"],
+      "depends": ["types"]
     },
     "primality": {
       "header": "include/milmon/math/primality.hpp",

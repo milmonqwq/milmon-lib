@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstring>
 #include <functional>
+#include <numeric>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -37,6 +38,7 @@ void test_global_types() {
     static_assert(std::is_same_v<i64, long long>);
     static_assert(std::is_same_v<ll, long long>);
     static_assert(std::is_same_v<ull, u64>);
+    static_assert(std::is_same_v<ld, long double>);
     static_assert(std::is_same_v<u128, __uint128_t>);
     static_assert(std::is_same_v<i128, __int128_t>);
 
@@ -95,6 +97,56 @@ void test_pollard_rho() {
         }
         assert(product == value);
         assert(std::is_sorted(factors.begin(), factors.end()));
+    }
+}
+
+void test_exgcd() {
+    int x = 0, y = 0;
+    static_assert(std::is_same_v<decltype(cp::exgcd(1, 1, x, y)), int>);
+    assert(cp::exgcd(30, 18, x, y) == 6);
+    assert(30 * x + 18 * y == 6);
+    assert(cp::exgcd(0, 0, x, y) == 0);
+    assert(0 * x + 0 * y == 0);
+    for (int a = -100; a <= 100; ++a) {
+        for (int b = -100; b <= 100; ++b) {
+            const int g = cp::exgcd(a, b, x, y);
+            assert(g == std::gcd(a, b));
+            assert(a * x + b * y == g);
+        }
+    }
+    long long lx = 0, ly = 0;
+    constexpr long long a = 4000000007LL, b = 3000000019LL;
+    static_assert(std::is_same_v<decltype(cp::exgcd(a, b, lx, ly)), long long>);
+    const long long g = cp::exgcd(a, b, lx, ly);
+    assert(g == std::gcd(a, b));
+    assert(i128(a) * lx + i128(b) * ly == g);
+}
+
+i64 brute_floor_sum(i64 n, i64 m, i64 a, i64 b) {
+    i64 res = 0;
+    for (i64 i = 0; i < n; ++i) {
+        const i64 v = a * i + b;
+        i64 q = v / m;
+        if (v % m < 0) --q;
+        res += q;
+    }
+    return res;
+}
+
+void test_floor_sum() {
+    assert(cp::floor_sum(0, 7, 3, 4) == 0);
+    assert(cp::floor_sum(4, 10, 6, 3) == 3);
+    assert(cp::floor_sum(5, 7, -3, 4) == -4);
+    assert(cp::floor_sum(4000000000LL, 4000000000LL, 3999999999LL,
+                         3999999999LL) == 7999999998000000000LL);
+    for (i64 n = 0; n <= 20; ++n) {
+        for (i64 m = 1; m <= 12; ++m) {
+            for (i64 a = -20; a <= 20; ++a) {
+                for (i64 b = -20; b <= 20; ++b) {
+                    assert(cp::floor_sum(n, m, a, b) == brute_floor_sum(n, m, a, b));
+                }
+            }
+        }
     }
 }
 
@@ -193,6 +245,78 @@ void test_fenwick() {
     zeroes.add(3, 7);
     assert(zeroes.prefix_sum(3) == 0);
     assert(zeroes.prefix_sum(4) == 7);
+}
+
+void test_p2() {
+    cp::p2 a{2, -3}, b{-4, 5};
+    assert(a + b == (cp::p2{-2, 2}));
+    assert(a - b == (cp::p2{6, -8}));
+    assert(-a == (cp::p2{-2, 3}));
+    assert(3 * a == (cp::p2{6, -9}));
+    assert(cp::dot(a, b) == -23);
+    assert(cp::cross(a, b) == -2);
+    assert(cp::cross(cp::p2{1, 1}, cp::p2{3, 1}, cp::p2{2, 4}) == 6);
+    assert(cp::cross(cp::p2{INT_MIN, 0}, cp::p2{INT_MAX, 0},
+                     cp::p2{INT_MIN, 1}) == 4294967295LL);
+    a += b;
+    assert(a == (cp::p2{-2, 2}));
+    a -= b;
+    a *= 2;
+    assert(a == (cp::p2{4, -6}));
+}
+
+void test_p2r() {
+    cp::p2r<double> a{1.5, -2.0}, b{-0.5, 4.0};
+    assert(a + b == (cp::p2r<double>{1.0, 2.0}));
+    assert(a - b == (cp::p2r<double>{2.0, -6.0}));
+    assert(-a == (cp::p2r<double>{-1.5, 2.0}));
+    assert(2 * a == (cp::p2r<double>{3.0, -4.0}));
+    assert(a / 2 == (cp::p2r<double>{0.75, -1.0}));
+    assert(cp::dot(a, b) == -8.75);
+    assert(cp::cross(a, b) == 5.0);
+    assert(cp::cross(cp::p2r<double>{1.0, 1.0}, cp::p2r<double>{2.5, 1.0},
+                     cp::p2r<double>{1.0, 3.0}) == 3.0);
+    a += b;
+    a -= b;
+    a *= 2;
+    a /= 4;
+    assert(a == (cp::p2r<double>{0.75, -1.0}));
+    cp::p2r<ld> c{1.0L, 2.0L}, d{3.0L, -1.0L};
+    static_assert(std::is_same_v<decltype(cp::dot(c, d)), ld>);
+    assert(cp::dot(c, d) == 1.0L);
+    assert(cp::cross(c, d) == -7.0L);
+}
+
+void test_convex_hull() {
+    assert(cp::convex_hull({}).empty());
+    assert((cp::convex_hull({{2, 3}, {2, 3}}) == std::vector<cp::p2>{{2, 3}}));
+    assert((cp::convex_hull({{0, 0}, {1, 0}, {2, 0}, {1, 0}}) ==
+            std::vector<cp::p2>{{0, 0}, {2, 0}}));
+    std::vector<cp::p2> ps{{0, 0}, {2, 0}, {2, 2}, {0, 2}, {1, 0},
+                           {2, 1}, {1, 2}, {0, 1}, {1, 1}, {0, 0}};
+    assert((cp::convex_hull(ps) ==
+            std::vector<cp::p2>{{0, 0}, {2, 0}, {2, 2}, {0, 2}}));
+    const std::vector<cp::p2> grid{{-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 0},
+                                   {0, 1},   {1, -1}, {1, 0},  {1, 1}};
+    for (int mask = 0; mask < (1 << int(grid.size())); ++mask) {
+        std::vector<cp::p2> points;
+        for (int i = 0; i < int(grid.size()); ++i) {
+            if (mask >> i & 1) points.push_back(grid[i]);
+        }
+        const std::vector<cp::p2> hull = cp::convex_hull(points);
+        if (hull.empty()) { assert(points.empty()); continue; }
+        assert(hull.front() == *std::min_element(points.begin(), points.end()));
+        if (hull.size() == 1) { assert(points.size() == 1); continue; }
+        if (hull.size() == 2) {
+            for (cp::p2 p : points) assert(cp::cross(hull[0], hull[1], p) == 0);
+            continue;
+        }
+        for (std::size_t i = 0; i < hull.size(); ++i) {
+            cp::p2 a = hull[i], b = hull[(i + 1) % hull.size()];
+            assert(cp::cross(hull[(i + hull.size() - 1) % hull.size()], a, b) > 0);
+            for (cp::p2 p : points) assert(cp::cross(a, b, p) >= 0);
+        }
+    }
 }
 
 void test_kmp() {
@@ -304,9 +428,14 @@ int main() {
     test_dsu();
     test_primality();
     test_pollard_rho();
+    test_exgcd();
+    test_floor_sum();
     test_fast_io();
     test_rmq();
     test_fenwick();
+    test_p2();
+    test_p2r();
+    test_convex_hull();
     test_kmp();
     test_z_function();
     test_manacher();
