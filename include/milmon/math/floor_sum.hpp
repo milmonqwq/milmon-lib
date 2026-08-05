@@ -7,23 +7,25 @@
 namespace cp {
 
 inline i64 floor_sum(i64 n, i64 m, i64 a, i64 b) {
-    i128 nn = n, mm = m, aa = a, bb = b, res = 0;
-    i128 q = aa / mm;
-    aa %= mm;
-    if (aa < 0) { aa += mm; --q; }
-    res += nn * (nn - 1) / 2 * q;
-    q = bb / mm;
-    bb %= mm;
-    if (bb < 0) { bb += mm; --q; }
-    res += nn * q;
+    i128 res = 0;
+    i64 q = a / m;
+    a %= m;
+    if (a < 0) { a += m; --q; }
+    res += i128(n) * (i128(n) - 1) / 2 * q;
+    q = b / m;
+    b %= m;
+    if (b < 0) { b += m; --q; }
+    res += i128(n) * q;
     for (;;) {
-        if (aa >= mm) { res += nn * (nn - 1) / 2 * (aa / mm); aa %= mm; }
-        if (bb >= mm) { res += nn * (bb / mm); bb %= mm; }
-        const i128 y = aa * nn + bb;
-        if (y < mm) return i64(res);
-        nn = y / mm;
-        bb = y % mm;
-        std::swap(aa, mm);
+        const i128 y = i128(a) * n + b;
+        if (y < m) return i64(res);
+        n = i64(y / m);
+        b = i64(y % m);
+        std::swap(a, m);
+        res += i128(n) * (n - 1) / 2 * (a / m);
+        a %= m;
+        res += i128(n) * (b / m);
+        b %= m;
     }
 }
 

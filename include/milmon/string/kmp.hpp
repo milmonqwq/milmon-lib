@@ -30,6 +30,7 @@ inline std::vector<int> kmp(const Text& text, const Pattern& pattern) {
         for (int i = 0; i <= n; ++i) pos[i] = i;
         return pos;
     }
+    if (m > n) return pos;
     const std::vector<int> pi = prefix_function(pattern);
     int j = 0;
     for (int i = 0; i < n; ++i) {

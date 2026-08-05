@@ -45,9 +45,10 @@ inline std::vector<int> sa_is(const std::vector<int>& s, int upper) {
         sum_s[i] += sum_l[i];
         if (i < upper) sum_l[i + 1] += sum_s[i];
     }
+    std::vector<int> buf(upper + 1);
     auto induce = [&](const std::vector<int>& lms) {
         std::fill(sa.begin(), sa.end(), -1);
-        std::vector<int> buf = sum_s;
+        buf = sum_s;
         for (int p : lms) sa[buf[s[p]]++] = p;
         buf = sum_l;
         sa[buf[s[n - 1]]++] = n - 1;
@@ -226,9 +227,10 @@ struct SuffixArray {
         for (int i = 0; i < n; ++i) inv_rnk[inv_sa[i]] = i;
         std::vector<std::array<int, 3>> res;
         res.reserve(n);
+        std::vector<int> st;
+        st.reserve(n);
         auto collect = [&](const std::vector<int>& rank) {
-            std::vector<int> st;
-            st.reserve(n);
+            st.clear();
             for (int i = n - 1; i >= 0; --i) {
                 while (!st.empty() && rank[i] < rank[st.back()]) st.pop_back();
                 const int j = st.empty() ? n : st.back();
@@ -244,10 +246,7 @@ struct SuffixArray {
         detail::radix_sort_runs(res, n);
         auto out = res.begin();
         for (const auto& run : res) {
-            if (out == res.begin() || (*std::prev(out))[0] != run[0] ||
-                (*std::prev(out))[1] != run[1]) {
-                *out++ = run;
-            }
+            if (out == res.begin() || out[-1][0] != run[0] || out[-1][1] != run[1]) *out++ = run;
         }
         res.erase(out, res.end());
         return res;

@@ -2,8 +2,8 @@
 
 #include <milmon/all.hpp>
 
-// FastScanner in a comment must not pull in fast_io.
-const char* ignored_text = R"tag(FastOutput is also not code)tag";
+// RMQ in a comment must not pull in rmq.
+const char* ignored_text = R"tag(Fenwick is also not code)tag";
 
 int main() {
     cp::DSU sets(3);

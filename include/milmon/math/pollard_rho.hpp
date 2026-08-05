@@ -79,8 +79,10 @@ inline void factorize_into(u64 n, std::vector<u64>& factors) {
 inline std::vector<u64> factorize(u64 n) {
     std::vector<u64> res;
     if (n < 2) return res;
+    res.reserve(16);
     for (u64 p : detail::small_primes) {
         while (n % p == 0) { res.push_back(p); n /= p; }
+        if (n == 1) break;
     }
     if (n != 1) detail::factorize_into(n, res);
     std::sort(res.begin(), res.end());

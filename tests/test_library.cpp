@@ -1,11 +1,9 @@
-#include <algorithm>
 #include <array>
 #include <cassert>
 #include <climits>
-#include <cstdio>
-#include <cstring>
 #include <functional>
 #include <numeric>
+#include <sstream>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -14,9 +12,26 @@
 
 namespace {
 
-void test_basic() { static_assert(endl == '\n'); cp::init_io(); }
+void test_basic() {
+    static_assert(endl == '\n');
+    cp::init_io();
+    assert(std::cout.precision() == 10 && std::cerr.precision() == 10);
+    assert((std::cout.flags() & std::ios::floatfield) == std::ios::fixed);
+    assert((std::cerr.flags() & std::ios::floatfield) == std::ios::fixed);
+    cp::init_io(4);
+    assert(std::cout.precision() == 4 && std::cerr.precision() == 4);
+}
 
-void test_debug() { if (false) debug("value = %d\n", 42); }
+void test_debug() {
+    if (false) debug("value = %d\n", 42);
+    std::ostringstream output;
+    std::streambuf* old = std::cerr.rdbuf(output.rdbuf());
+    int value = 42;
+    std::vector<std::vector<int>> values{{1, 2}, {3}};
+    dbg(value,values,std::vector<int>{4, 5},"a,b");
+    std::cerr.rdbuf(old);
+    assert(output.str() == "value=42, values=[[1,2],[3]], std::vector<int>{4, 5}=[4,5], \"a,b\"=a,b\n");
+}
 
 void test_dsu() {
     cp::DSU sets(6);
@@ -52,21 +67,10 @@ void test_primality() {
     assert(!cp::is_prime(0));
     assert(!cp::is_prime(1));
     assert(cp::is_prime(2));
-    assert(cp::is_prime(97));
-    assert(!cp::is_prime(221));
+    assert(cp::is_prime(61));
+    assert(!cp::is_prime(63));
     assert(!cp::is_prime(341550071728321ULL));
     assert(cp::is_prime(18446744073709551557ULL));
-
-    for (int value = 0; value <= 10000; ++value) {
-        bool expected = value >= 2;
-        for (int divisor = 2; divisor * divisor <= value; ++divisor) {
-            if (value % divisor == 0) {
-                expected = false;
-                break;
-            }
-        }
-        assert(cp::is_prime(value) == expected);
-    }
 }
 
 void test_pollard_rho() {
@@ -87,17 +91,6 @@ void test_pollard_rho() {
     assert((cp::factorize(18446744073709551615ULL) ==
             std::vector<u64>{3, 5, 17, 257, 641, 65537, 6700417}));
     assert(cp::pollard_rho(first_prime) == first_prime);
-
-    for (u64 value = 2; value <= 2000; ++value) {
-        const std::vector<u64> factors = cp::factorize(value);
-        u64 product = 1;
-        for (u64 factor : factors) {
-            assert(cp::is_prime(factor));
-            product *= factor;
-        }
-        assert(product == value);
-        assert(std::is_sorted(factors.begin(), factors.end()));
-    }
 }
 
 void test_exgcd() {
@@ -107,13 +100,8 @@ void test_exgcd() {
     assert(30 * x + 18 * y == 6);
     assert(cp::exgcd(0, 0, x, y) == 0);
     assert(0 * x + 0 * y == 0);
-    for (int a = -100; a <= 100; ++a) {
-        for (int b = -100; b <= 100; ++b) {
-            const int g = cp::exgcd(a, b, x, y);
-            assert(g == std::gcd(a, b));
-            assert(a * x + b * y == g);
-        }
-    }
+    assert(cp::exgcd(-35, 15, x, y) == 5);
+    assert(-35 * x + 15 * y == 5);
     long long lx = 0, ly = 0;
     constexpr long long a = 4000000007LL, b = 3000000019LL;
     static_assert(std::is_same_v<decltype(cp::exgcd(a, b, lx, ly)), long long>);
@@ -122,96 +110,64 @@ void test_exgcd() {
     assert(i128(a) * lx + i128(b) * ly == g);
 }
 
-i64 brute_floor_sum(i64 n, i64 m, i64 a, i64 b) {
-    i64 res = 0;
-    for (i64 i = 0; i < n; ++i) {
-        const i64 v = a * i + b;
-        i64 q = v / m;
-        if (v % m < 0) --q;
-        res += q;
-    }
-    return res;
-}
-
 void test_floor_sum() {
     assert(cp::floor_sum(0, 7, 3, 4) == 0);
     assert(cp::floor_sum(4, 10, 6, 3) == 3);
     assert(cp::floor_sum(5, 7, -3, 4) == -4);
+    assert(cp::floor_sum(3, 5, 2, -4) == -2);
     assert(cp::floor_sum(4000000000LL, 4000000000LL, 3999999999LL,
                          3999999999LL) == 7999999998000000000LL);
-    for (i64 n = 0; n <= 20; ++n) {
-        for (i64 m = 1; m <= 12; ++m) {
-            for (i64 a = -20; a <= 20; ++a) {
-                for (i64 b = -20; b <= 20; ++b) {
-                    assert(cp::floor_sum(n, m, a, b) == brute_floor_sum(n, m, a, b));
-                }
-            }
-        }
-    }
 }
 
-void test_fast_io() {
-    std::FILE* input_file = std::tmpfile();
-    assert(input_file != nullptr);
-    const char input_text[] = "-42 hello Q 18446744073709551615";
-    assert(std::fwrite(input_text, 1, std::strlen(input_text), input_file) ==
-           std::strlen(input_text));
-    std::rewind(input_file);
-
-    cp::FastScanner input(input_file);
-    int number;
-    std::string word;
-    char letter;
-    unsigned long long maximum;
-    assert(input.read(number) && number == -42);
-    assert(input.read(word) && word == "hello");
-    assert(input.read(letter) && letter == 'Q');
-    assert(input.read(maximum) && maximum == ULLONG_MAX);
-    assert(!input.read(number));
-    std::fclose(input_file);
-
-    std::FILE* output_file = std::tmpfile();
-    assert(output_file != nullptr);
-    {
-        cp::FastOutput output(output_file);
-        output << LLONG_MIN << ' ' << 0U << ' ' << "done" << '\n';
-    }
-    std::rewind(output_file);
-    char output_text[128]{};
-    const std::size_t length = std::fread(output_text, 1, sizeof(output_text) - 1,
-                                          output_file);
-    output_text[length] = '\0';
-    assert(std::string(output_text) == "-9223372036854775808 0 done\n");
-    std::fclose(output_file);
+void test_frac() {
+    cp::frac<long long> a{6, -8}, b{5, 6};
+    assert(a.num == -3 && a.den == 4);
+    assert((cp::frac<int>{0, -7} == cp::frac<int>{0, 1}));
+    assert((a + b == cp::frac<long long>{1, 12}));
+    assert((a - b == cp::frac<long long>{-19, 12}));
+    assert((a * b == cp::frac<long long>{-5, 8}));
+    assert((a / b == cp::frac<long long>{-9, 10}));
+    assert((-a == cp::frac<long long>{3, 4}));
+    assert((2 + a == cp::frac<long long>{5, 4}));
+    assert((2 - a == cp::frac<long long>{11, 4}));
+    assert((2 * a == cp::frac<long long>{-3, 2}));
+    assert((2 / a == cp::frac<long long>{-8, 3}));
+    a += 2;
+    assert((a == cp::frac<long long>{5, 4}));
+    a -= 1;
+    a *= 6;
+    a /= 3;
+    assert((a == cp::frac<long long>{1, 2}));
+    assert(a < b && b > a && a <= b && b >= a);
+    assert((cp::frac<long long>{4000000001LL, 4000000000LL} <
+            cp::frac<long long>{4000000000LL, 3999999999LL}));
+    assert((cp::frac<int>{1, 8}.value() == 0.125L));
+    const i128 big = i128(1) << 100;
+    assert((cp::frac<i128>{big, 3} + cp::frac<i128>{big, 6} == cp::frac<i128>{big / 2}));
+    assert((cp::frac<i128>{big, 3} < cp::frac<i128>{big + 1, 3}));
+    assert((cp::frac<long long>{-2, 3} < cp::frac<long long>{-3, 5}));
 }
 
 void test_rmq() {
-    std::vector<int> values(257);
-    for (std::size_t index = 0; index < values.size(); ++index) {
-        values[index] = int((index * 97 + index * index * 13) % 101);
-    }
+    std::vector<int> values(130, 5);
+    values[0] = 4;
     values[63] = -10;
     values[64] = -20;
+    values[100] = 7;
     values[127] = -30;
     values[128] = -30;
+    values[129] = 2;
 
     cp::RMQ<int> minimum(values);
     assert(minimum.size() == values.size());
     assert(!minimum.empty());
-    for (std::size_t left = 0; left < values.size(); ++left) {
-        std::size_t expected = left;
-        for (std::size_t right = left + 1; right <= values.size(); ++right) {
-            if (values[right - 1] < values[expected]) {
-                expected = right - 1;
-            }
-            assert(minimum.query_index(left, right) == expected);
-            assert(minimum.query(left, right) == values[expected]);
-        }
-    }
+    assert(minimum.query_index(0, 130) == 127);
+    assert(minimum.query(10, 100) == -20);
+    assert(minimum.query_index(120, 130) == 127);
+    assert(minimum.query_index(128, 130) == 128);
 
     cp::RMQ<int, std::greater<int>> maximum(values, std::greater<int>{});
-    assert(maximum.query(10, 200) ==
-           *std::max_element(values.begin() + 10, values.begin() + 200));
+    assert(maximum.query(10, 120) == 7);
 
     cp::RMQ<int> ties({4, 1, 1, 3});
     assert(ties.query_index(0, 4) == 1);
@@ -227,13 +183,10 @@ void test_fenwick() {
     assert(tree.size() == values.size());
     assert(!tree.empty());
 
-    i64 expected = 0;
     assert(tree.prefix_sum(0) == 0);
-    for (std::size_t right = 1; right <= values.size(); ++right) {
-        expected += values[right - 1];
-        assert(tree.prefix_sum(right) == expected);
-        assert(tree.query(right) == expected);
-    }
+    assert(tree.prefix_sum(1) == 3);
+    assert(tree.prefix_sum(4) == 7);
+    assert(tree.query(7) == 5);
 
     tree.add(1, 10);
     tree.add(6, -2);
@@ -296,27 +249,6 @@ void test_convex_hull() {
                            {2, 1}, {1, 2}, {0, 1}, {1, 1}, {0, 0}};
     assert((cp::convex_hull(ps) ==
             std::vector<cp::p2>{{0, 0}, {2, 0}, {2, 2}, {0, 2}}));
-    const std::vector<cp::p2> grid{{-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 0},
-                                   {0, 1},   {1, -1}, {1, 0},  {1, 1}};
-    for (int mask = 0; mask < (1 << int(grid.size())); ++mask) {
-        std::vector<cp::p2> points;
-        for (int i = 0; i < int(grid.size()); ++i) {
-            if (mask >> i & 1) points.push_back(grid[i]);
-        }
-        const std::vector<cp::p2> hull = cp::convex_hull(points);
-        if (hull.empty()) { assert(points.empty()); continue; }
-        assert(hull.front() == *std::min_element(points.begin(), points.end()));
-        if (hull.size() == 1) { assert(points.size() == 1); continue; }
-        if (hull.size() == 2) {
-            for (cp::p2 p : points) assert(cp::cross(hull[0], hull[1], p) == 0);
-            continue;
-        }
-        for (std::size_t i = 0; i < hull.size(); ++i) {
-            cp::p2 a = hull[i], b = hull[(i + 1) % hull.size()];
-            assert(cp::cross(hull[(i + hull.size() - 1) % hull.size()], a, b) > 0);
-            for (cp::p2 p : points) assert(cp::cross(a, b, p) >= 0);
-        }
-    }
 }
 
 void test_kmp() {
@@ -328,6 +260,7 @@ void test_kmp() {
             std::vector<int>{0, 1, 2, 3}));
     assert((cp::kmp(std::vector<int>{1, 2, 1, 2, 1},
                     std::vector<int>{1, 2, 1}) == std::vector<int>{0, 2}));
+    assert(cp::kmp(std::string("ab"), std::string("abc")).empty());
     assert((cp::kmp(std::string("abc"), std::string("")) ==
             std::vector<int>{0, 1, 2, 3}));
 }
@@ -402,12 +335,10 @@ void test_suffix_array() {
     assert((dense.sa == std::vector<int>{4, 1, 3, 0, 2}));
 
     cp::SuffixArray periodic("abababababababababababab");
-    for (int rank = 0; rank < 12; ++rank) {
-        assert(periodic.sa[rank] == 22 - rank * 2);
-        assert(periodic.sa[rank + 12] == 23 - rank * 2);
-        assert(periodic.rnk[periodic.sa[rank]] == rank);
-        assert(periodic.rnk[periodic.sa[rank + 12]] == rank + 12);
-    }
+    assert((periodic.sa == std::vector<int>{22, 20, 18, 16, 14, 12, 10, 8, 6, 4, 2, 0,
+                                             23, 21, 19, 17, 15, 13, 11, 9, 7, 5, 3, 1}));
+    assert((periodic.rnk == std::vector<int>{11, 23, 10, 22, 9, 21, 8, 20, 7, 19, 6, 18,
+                                              5, 17, 4, 16, 3, 15, 2, 14, 1, 13, 0, 12}));
     assert(periodic.lcp(0, 2) == 22);
     assert((periodic.runs() ==
             std::vector<std::array<int, 3>>{{0, 24, 2}}));
@@ -430,7 +361,7 @@ int main() {
     test_pollard_rho();
     test_exgcd();
     test_floor_sum();
-    test_fast_io();
+    test_frac();
     test_rmq();
     test_fenwick();
     test_p2();

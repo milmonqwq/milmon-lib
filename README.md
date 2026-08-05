@@ -51,15 +51,15 @@ include/milmon/
 ├── math/
 │   ├── exgcd.hpp
 │   ├── floor_sum.hpp
+│   ├── frac.hpp
 │   ├── primality.hpp
 │   └── pollard_rho.hpp
-├── string/
-│   ├── kmp.hpp
-│   ├── lyndon.hpp
-│   ├── manacher.hpp
-│   ├── suffix_array.hpp
-│   └── z_function.hpp
-└── fast_io.hpp
+└── string/
+    ├── kmp.hpp
+    ├── lyndon.hpp
+    ├── manacher.hpp
+    ├── suffix_array.hpp
+    └── z_function.hpp
 ```
 
 ### 全局整数类型
@@ -87,15 +87,25 @@ cp::init_io();
 std::cout << value << endl;
 ```
 
-`basic.hpp` 将 `endl` 定义为 `'\n'`。`init_io()` 会关闭 iostream 与 stdio 同步，并解除 `cin`、`cout` 的绑定。
+`basic.hpp` 将 `endl` 定义为 `'\n'`。`init_io(precision)` 会关闭 iostream 与 stdio 同步，解除 `cin`、`cout` 的绑定，并将 `cout`、`cerr` 的浮点数输出设置为 `fixed` 和指定精度；`precision` 默认为 `10`。
+
+需要使用文件输入输出时，可以调用：
+
+```cpp
+cp::file_io("example"); // example.in -> stdin，stdout -> example.out
+```
 
 ### Debug 输出
 
 ```cpp
+std::vector<int> values{1, 2, 3};
 debug("value = %d\n", value);
+// stderr: value = 42
+dbg(value, values);
+// stderr: value=42, values=[1,2,3]
 ```
 
-`debug(...)` 直接展开为 `std::fprintf(stderr, __VA_ARGS__)`。
+`debug(...)` 保持为 `std::fprintf(stderr, __VA_ARGS__)`。`dbg(...)` 会将每个表达式的文本和值输出到 `std::cerr`，并支持直接输出 `std::vector` 等可迭代容器；`std::string` 仍按字符串输出。
 
 ### DSU
 
@@ -133,6 +143,15 @@ i64 sum = cp::floor_sum(n, m, a, b);
 
 计算 `0 <= i < n` 时 `floor((a*i+b)/m)` 的总和，时间复杂度为 O(log m)。要求 `n >= 0`、`m > 0` 且答案能用 `i64` 表示；`a`、`b` 可以为负数。
 
+### 分数
+
+```cpp
+cp::frac<i128> a{1, 2}, b{1, 3};
+auto sum = a + b; // 5/6
+```
+
+`frac<T>` 要求 `T` 为有符号整数类型，可以直接使用 `i128`。成员 `num`、`den` 分别表示分子和分母；构造后会自动约分并保证分母为正。支持四则运算、复合赋值、与整数混合运算和全部比较运算；`value()` 返回 `long double` 近似值。要求分母非零、除数非零，用户需要自行保证四则运算不溢出；对 `frac<i128>` 进行比较时，还需保证交叉相乘不会超出 `i128` 的表示范围。
+
 ### Pollard–Rho 分解
 
 ```cpp
@@ -141,20 +160,6 @@ std::vector<u64> factors = cp::factorize(n); // 有序质因子，包含重数
 ```
 
 `pollard_rho` 对质数返回其自身。`factorize` 对小于 2 的数返回空数组，其余情况结合确定性 Miller–Rabin 递归分解。实现采用 Brent 批量 GCD 版本的 Pollard–Rho。
-
-### 快读快写
-
-```cpp
-cp::FastScanner input;
-cp::FastOutput output;
-
-int n;
-std::string word;
-input >> n >> word;
-output << n << ' ' << word << '\n';
-```
-
-也可以使用会返回成功与否的 `input.read(value)`，方便判断 EOF。输出对象析构时会自动刷新，也可以手动调用 `flush()`。
 
 ### RMQ
 
@@ -299,7 +304,7 @@ std::vector<int> rnk = cp::build_rnk(values, upper);
 或者在命令行指定：
 
 ```bash
-python3 tools/bundle.py solution.cpp --require dsu --require fast_io -o submission.cpp
+python3 tools/bundle.py solution.cpp --require dsu --require fenwick -o submission.cpp
 ```
 
 查看模块名和触发符号：

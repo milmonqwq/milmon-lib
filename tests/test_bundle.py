@@ -37,8 +37,8 @@ class BundleTests(unittest.TestCase):
             self.assertIn("class DSU", bundled)
             self.assertIn("inline bool is_prime(T n)", bundled)
             self.assertIn("using u32 =", bundled)
-            self.assertNotIn("class FastScanner", bundled)
             self.assertNotIn("class RMQ", bundled)
+            self.assertNotIn("class Fenwick", bundled)
             self.assertNotIn("#include <milmon/all.hpp>", bundled)
             self.assertLess(
                 bundled.index("// milmon-lib/types.hpp"),
@@ -68,13 +68,13 @@ class BundleTests(unittest.TestCase):
             source = Path(directory) / "main.cpp"
             source.write_text(
                 "#include <milmon/all.hpp>\n"
-                "// milmon: require fast_io\n"
+                "// milmon: require rmq\n"
                 "int main() {}\n",
                 encoding="utf-8",
             )
             result = self.run_bundle(source)
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("class FastScanner", result.stdout)
+            self.assertIn("class RMQ", result.stdout)
             self.assertNotIn("class DSU", result.stdout)
 
     def test_direct_module_include_is_expanded(self) -> None:
@@ -95,8 +95,12 @@ class BundleTests(unittest.TestCase):
             submission = Path(directory) / "submission.cpp"
             executable = Path(directory) / "submission"
             source.write_text(
+                "#include <string>\n"
+                "#include <vector>\n"
                 "#include <milmon/all.hpp>\n"
-                "int main() { debug(\"value = %d\\n\", 7); }\n",
+                "int main() { debug(\"raw = %d\\n\", 5); int value = 7; "
+                "std::vector<int> values{1, 2}; "
+                "dbg(value,values,std::vector<int>{3, 4},\"a,b\"); }\n",
                 encoding="utf-8",
             )
             result = self.run_bundle(source, "-o", str(submission), "--explain")
@@ -104,6 +108,7 @@ class BundleTests(unittest.TestCase):
             self.assertIn("selected debug", result.stderr)
             bundled = submission.read_text(encoding="utf-8")
             self.assertIn("#define debug(...) std::fprintf(stderr, __VA_ARGS__)", bundled)
+            self.assertIn("#define dbg(...) debug_impl(#__VA_ARGS__, __VA_ARGS__)", bundled)
             self.assertNotIn("class DSU", bundled)
             compile_result = subprocess.run(
                 ["g++", "-std=c++17", "-O2", str(submission), "-o", str(executable)],
@@ -116,7 +121,12 @@ class BundleTests(unittest.TestCase):
                 [str(executable)], text=True, capture_output=True, check=False
             )
             self.assertEqual(run_result.returncode, 0, run_result.stderr)
-            self.assertEqual(run_result.stderr, "value = 7\n")
+            self.assertEqual(
+                run_result.stderr,
+                'raw = 5\nvalue=7, values=[1,2], '
+                'std::vector<int>{3, 4}=[3,4], '
+                '"a,b"=a,b\n',
+            )
 
     def test_basic_io_is_selected_and_compiles(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -125,7 +135,7 @@ class BundleTests(unittest.TestCase):
             executable = Path(directory) / "submission"
             source.write_text(
                 "#include <milmon/all.hpp>\n"
-                "int main() { cp::init_io(); std::cout << 7 << endl; }\n",
+                "int main() { cp::init_io(3); std::cout << 1.25 << endl; }\n",
                 encoding="utf-8",
             )
             result = self.run_bundle(source, "-o", str(submission), "--explain")
@@ -145,7 +155,39 @@ class BundleTests(unittest.TestCase):
                 [str(executable)], text=True, capture_output=True, check=False
             )
             self.assertEqual(run_result.returncode, 0, run_result.stderr)
-            self.assertEqual(run_result.stdout, "7\n")
+            self.assertEqual(run_result.stdout, "1.250\n")
+
+    def test_file_io_redirects_standard_streams(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            source = temporary / "main.cpp"
+            submission = temporary / "submission.cpp"
+            executable = temporary / "submission"
+            source.write_text(
+                "#include <milmon/all.hpp>\n"
+                "int main() { cp::file_io(\"sample\"); int x; std::cin >> x; "
+                "std::cout << x * 2 << '\\n'; }\n",
+                encoding="utf-8",
+            )
+            result = self.run_bundle(source, "-o", str(submission), "--explain")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("selected basic", result.stderr)
+            compile_result = subprocess.run(
+                ["g++", "-std=c++17", "-O2", str(submission), "-o", str(executable)],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(compile_result.returncode, 0, compile_result.stderr)
+            (temporary / "sample.in").write_text("21\n", encoding="utf-8")
+            run_result = subprocess.run(
+                [str(executable)], cwd=temporary, text=True, capture_output=True, check=False
+            )
+            self.assertEqual(run_result.returncode, 0, run_result.stderr)
+            self.assertEqual(run_result.stdout, "")
+            self.assertEqual(
+                (temporary / "sample.out").read_text(encoding="utf-8"), "42\n"
+            )
 
     def test_pollard_rho_pulls_transitive_dependencies(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -200,6 +242,36 @@ class BundleTests(unittest.TestCase):
             bundled = submission.read_text(encoding="utf-8")
             self.assertIn("inline T exgcd", bundled)
             self.assertIn("inline i64 floor_sum", bundled)
+            compile_result = subprocess.run(
+                ["g++", "-std=c++17", "-O2", str(submission), "-o", str(executable)],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(compile_result.returncode, 0, compile_result.stderr)
+            run_result = subprocess.run(
+                [str(executable)], text=True, capture_output=True, check=False
+            )
+            self.assertEqual(run_result.returncode, 0, run_result.stderr)
+
+    def test_frac_is_selected_and_compiles(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "main.cpp"
+            submission = Path(directory) / "submission.cpp"
+            executable = Path(directory) / "submission"
+            source.write_text(
+                "#include <milmon/all.hpp>\n"
+                "int main() { i128 n = i128(1) << 100; "
+                "cp::frac<i128> a{n, 3}, b{n, 6}; "
+                "return a + b != cp::frac<i128>{n / 2}; }\n",
+                encoding="utf-8",
+            )
+            result = self.run_bundle(source, "-o", str(submission), "--explain")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("selected types, frac", result.stderr)
+            bundled = submission.read_text(encoding="utf-8")
+            self.assertIn("struct frac", bundled)
+            self.assertNotIn("inline i64 floor_sum", bundled)
             compile_result = subprocess.run(
                 ["g++", "-std=c++17", "-O2", str(submission), "-o", str(executable)],
                 text=True,

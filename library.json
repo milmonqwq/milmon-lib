@@ -9,12 +9,12 @@
     },
     "basic": {
       "header": "include/milmon/basic.hpp",
-      "symbols": ["endl", "init_io"],
+      "symbols": ["endl", "init_io", "file_io"],
       "depends": []
     },
     "debug": {
       "header": "include/milmon/debug.hpp",
-      "symbols": ["debug"],
+      "symbols": ["debug", "dbg"],
       "depends": []
     },
     "dsu": {
@@ -72,11 +72,6 @@
       "symbols": ["z_function"],
       "depends": []
     },
-    "fast_io": {
-      "header": "include/milmon/fast_io.hpp",
-      "symbols": ["FastScanner", "FastOutput"],
-      "depends": []
-    },
     "exgcd": {
       "header": "include/milmon/math/exgcd.hpp",
       "symbols": ["exgcd"],
@@ -86,6 +81,11 @@
       "header": "include/milmon/math/floor_sum.hpp",
       "symbols": ["floor_sum"],
       "depends": ["types"]
+    },
+    "frac": {
+      "header": "include/milmon/math/frac.hpp",
+      "symbols": ["frac"],
+      "depends": []
     },
     "primality": {
       "header": "include/milmon/math/primality.hpp",
