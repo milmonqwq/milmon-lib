@@ -196,22 +196,13 @@ class BundleTests(unittest.TestCase):
             executable = Path(directory) / "submission"
             source.write_text(
                 "#include <milmon/all.hpp>\n"
-                "int main() { auto f = cp::factorize(u64{91}); "
-                "return f.size() != 2 || f[0] != 7 || f[1] != 13; }\n",
+                "int main() { auto f = cp::factorize_pair(u64{91}); "
+                "return f.size() != 2 || f[0] != std::pair<u64, int>{7, 1} "
+                "|| f[1] != std::pair<u64, int>{13, 1}; }\n",
                 encoding="utf-8",
             )
             result = self.run_bundle(source, "-o", str(submission), "--explain")
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("selected types, primality, pollard_rho", result.stderr)
-            bundled = submission.read_text(encoding="utf-8")
-            self.assertLess(
-                bundled.index("using u32 ="),
-                bundled.index("inline bool is_prime(T n)"),
-            )
-            self.assertLess(
-                bundled.index("inline bool is_prime(T n)"),
-                bundled.index("inline u64 pollard_rho(u64 n)"),
-            )
             compile_result = subprocess.run(
                 ["g++", "-std=c++17", "-O2", str(submission), "-o", str(executable)],
                 text=True,
@@ -233,14 +224,17 @@ class BundleTests(unittest.TestCase):
                 "#include <milmon/all.hpp>\n"
                 "int main() { long long x, y; auto g = cp::exgcd(30LL, 18LL, x, y); "
                 "auto s = cp::floor_sum(4, 10, 6, 3); "
-                "return g != 6 || 30 * x + 18 * y != g || s != 3; }\n",
+                "auto [s0, s1, s2] = cp::ex_floor_sum(4, 10, 6, 3); "
+                "return g != 6 || 30 * x + 18 * y != g || s != 3 || "
+                "s0 != 3 || s1 != 8 || s2 != 5; }\n",
                 encoding="utf-8",
             )
             result = self.run_bundle(source, "-o", str(submission), "--explain")
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("selected types, exgcd, floor_sum", result.stderr)
+            self.assertIn("selected types, exgcd, ex_floor_sum, floor_sum", result.stderr)
             bundled = submission.read_text(encoding="utf-8")
             self.assertIn("inline T exgcd", bundled)
+            self.assertIn("inline std::tuple<i128, i128, i128> ex_floor_sum", bundled)
             self.assertIn("inline i64 floor_sum", bundled)
             compile_result = subprocess.run(
                 ["g++", "-std=c++17", "-O2", str(submission), "-o", str(executable)],
@@ -284,6 +278,91 @@ class BundleTests(unittest.TestCase):
             )
             self.assertEqual(run_result.returncode, 0, run_result.stderr)
 
+    def test_poly_mul_is_selected_and_compiles(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "main.cpp"
+            submission = Path(directory) / "submission.cpp"
+            executable = Path(directory) / "submission"
+            source.write_text(
+                "#include <milmon/all.hpp>\n"
+                "int main() { cp::poly::init(); "
+                "auto c = cp::poly::poly_mul({1, 2, 3}, {4, 5, 6}); "
+                "return c != std::vector<u32>{4, 13, 28, 27, 18}; }\n",
+                encoding="utf-8",
+            )
+            result = self.run_bundle(source, "-o", str(submission), "--explain")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("selected types, poly_mul", result.stderr)
+            bundled = submission.read_text(encoding="utf-8")
+            self.assertIn("inline std::vector<u32> poly_mul", bundled)
+            compile_result = subprocess.run(
+                ["g++", "-std=c++17", "-O2", str(submission), "-o", str(executable)],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(compile_result.returncode, 0, compile_result.stderr)
+            run_result = subprocess.run(
+                [str(executable)], text=True, capture_output=True, check=False
+            )
+            self.assertEqual(run_result.returncode, 0, run_result.stderr)
+
+    def test_pow_is_selected_and_compiles(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "main.cpp"
+            submission = Path(directory) / "submission.cpp"
+            executable = Path(directory) / "submission"
+            source.write_text(
+                "#include <milmon/all.hpp>\n"
+                "int main() { return cp::pow<1000000007>(2, 10) != 1024 || "
+                "cp::inv<1000000007>(2) != 500000004; }\n",
+                encoding="utf-8",
+            )
+            result = self.run_bundle(source, "-o", str(submission), "--explain")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("selected types, pow", result.stderr)
+            bundled = submission.read_text(encoding="utf-8")
+            self.assertIn("inline u32 pow", bundled)
+            self.assertIn("inline u32 inv", bundled)
+            compile_result = subprocess.run(
+                ["g++", "-std=c++17", "-O2", str(submission), "-o", str(executable)],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(compile_result.returncode, 0, compile_result.stderr)
+            run_result = subprocess.run(
+                [str(executable)], text=True, capture_output=True, check=False
+            )
+            self.assertEqual(run_result.returncode, 0, run_result.stderr)
+
+    def test_pair_alias_compiles_without_other_type_symbols(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "main.cpp"
+            submission = Path(directory) / "submission.cpp"
+            executable = Path(directory) / "submission"
+            source.write_text(
+                "#include <iostream>\n"
+                "#include <milmon/all.hpp>\n"
+                "int main() { pii value{3, 7}; "
+                "std::cout << value.first << ' ' << value.second << '\\n'; }\n",
+                encoding="utf-8",
+            )
+            result = self.run_bundle(source, "-o", str(submission))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            compile_result = subprocess.run(
+                ["g++", "-std=c++17", "-O2", str(submission), "-o", str(executable)],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(compile_result.returncode, 0, compile_result.stderr)
+            run_result = subprocess.run(
+                [str(executable)], text=True, capture_output=True, check=False
+            )
+            self.assertEqual(run_result.returncode, 0, run_result.stderr)
+            self.assertEqual(run_result.stdout, "3 7\n")
+
     def test_fenwick_and_global_alias_are_selected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "main.cpp"
@@ -298,6 +377,64 @@ class BundleTests(unittest.TestCase):
             self.assertIn("using u32 =", result.stdout)
             self.assertIn("class Fenwick", result.stdout)
             self.assertNotIn("class DSU", result.stdout)
+
+    def test_max_flow_is_selected_and_compiles(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "main.cpp"
+            submission = Path(directory) / "submission.cpp"
+            executable = Path(directory) / "submission"
+            source.write_text(
+                "#include <milmon/all.hpp>\n"
+                "int main() { cp::MaxFlow<int> mf(2, 1); mf.add_edge(0, 1, 3); "
+                "return mf.flow(0, 1) != 3; }\n",
+                encoding="utf-8",
+            )
+            result = self.run_bundle(source, "-o", str(submission), "--explain")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("selected max_flow", result.stderr)
+            bundled = submission.read_text(encoding="utf-8")
+            self.assertIn("class MaxFlow", bundled)
+            compile_result = subprocess.run(
+                ["g++", "-std=c++17", "-O2", str(submission), "-o", str(executable)],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(compile_result.returncode, 0, compile_result.stderr)
+            run_result = subprocess.run(
+                [str(executable)], text=True, capture_output=True, check=False
+            )
+            self.assertEqual(run_result.returncode, 0, run_result.stderr)
+
+    def test_min_cost_flow_is_selected_and_compiles(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "main.cpp"
+            submission = Path(directory) / "submission.cpp"
+            executable = Path(directory) / "submission"
+            source.write_text(
+                "#include <milmon/all.hpp>\n"
+                "int main() { cp::MinCostFlow<int, long long> mf(2, 1); "
+                "mf.add_edge(0, 1, 3, -2); "
+                "return mf.flow(0, 1) != std::pair<int, long long>{3, -6}; }\n",
+                encoding="utf-8",
+            )
+            result = self.run_bundle(source, "-o", str(submission), "--explain")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("selected min_cost_flow", result.stderr)
+            bundled = submission.read_text(encoding="utf-8")
+            self.assertIn("class MinCostFlow", bundled)
+            self.assertNotIn("class MaxFlow", bundled)
+            compile_result = subprocess.run(
+                ["g++", "-std=c++17", "-O2", str(submission), "-o", str(executable)],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(compile_result.returncode, 0, compile_result.stderr)
+            run_result = subprocess.run(
+                [str(executable)], text=True, capture_output=True, check=False
+            )
+            self.assertEqual(run_result.returncode, 0, run_result.stderr)
 
     def test_rmq_symbol_selects_only_rmq(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

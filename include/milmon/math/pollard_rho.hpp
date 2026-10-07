@@ -3,21 +3,21 @@
 #include <algorithm>
 #include <limits>
 #include <numeric>
+#include <utility>
 #include <vector>
 
 #include "milmon/math/primality.hpp"
+#include "milmon/misc/splitmix64.hpp"
 
 namespace cp {
 namespace detail {
 
-inline u64 splitmix64(u64& state) {
-    u64 x = (state += 0x9e3779b97f4a7c15ULL);
-    x = (x ^ (x >> 30U)) * 0xbf58476d1ce4e5b9ULL;
-    x = (x ^ (x >> 27U)) * 0x94d049bb133111ebULL;
-    return x ^ (x >> 31U);
+inline u64 pollard_random() {
+    static thread_local u64 state = 0x243f6a8885a308d3ULL;
+    const u64 res = splitmix64(state);
+    state += 0x9e3779b97f4a7c15ULL;
+    return res;
 }
-
-inline u64 pollard_random() { static thread_local u64 state = 0x243f6a8885a308d3ULL; return splitmix64(state); }
 
 inline u64 rho_step(u64 x, u64 c, u64 mod) { return u64((u128(x) * x + c) % mod); }
 
@@ -86,6 +86,15 @@ inline std::vector<u64> factorize(u64 n) {
     }
     if (n != 1) detail::factorize_into(n, res);
     std::sort(res.begin(), res.end());
+    return res;
+}
+
+inline std::vector<std::pair<u64, int>> factorize_pair(u64 n) {
+    std::vector<std::pair<u64, int>> res;
+    for (u64 p : factorize(n)) {
+        if (res.empty() || res.back().first != p) res.emplace_back(p, 1);
+        else ++res.back().second;
+    }
     return res;
 }
 

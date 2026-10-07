@@ -2,6 +2,7 @@
 #include <cassert>
 #include <climits>
 #include <functional>
+#include <limits>
 #include <numeric>
 #include <sstream>
 #include <string>
@@ -46,6 +47,35 @@ void test_dsu() {
     assert(sets.size(0) == 1);
 }
 
+void test_ddsu() {
+    cp::DDSU sets(6);
+    assert(sets.find(0) == 0);
+    assert(!sets.same(0, 1));
+    assert(sets.unite(1, 2));
+    assert(sets.unite(1, 3));
+    assert(sets.unite(0, 2));
+    assert(sets.find(3) == 0);
+    assert(sets.unite(4, 0));
+    assert(sets.unite(5, 4));
+    assert(sets.find(3) == 5);
+    assert(sets.same(2, 5));
+    assert(!sets.unite(3, 1));
+    assert(!sets.unite(5, 5));
+    assert(sets.find(1) == 5);
+
+    sets.reset(2);
+    assert(sets.find(0) == 0);
+    assert(sets.find(1) == 1);
+    assert(!sets.same(0, 1));
+    sets.reset(0);
+    sets.reset(3);
+    assert(sets.find(2) == 2);
+
+    cp::DDSU empty;
+    empty.reset(1);
+    assert(empty.find(0) == 0);
+}
+
 void test_global_types() {
     static_assert(std::is_same_v<u32, std::uint32_t>);
     static_assert(std::is_same_v<u64, std::uint64_t>);
@@ -62,6 +92,27 @@ void test_global_types() {
     assert(u64(square >> 64U) == 1ULL << 62U);
 }
 
+void test_splitmix64() {
+    static_assert(cp::splitmix64(0) == 0xe220a8397b1dcdafULL);
+    assert(cp::splitmix64(1) == 0x910a2dec89025cc1ULL);
+    assert(cp::splitmix64(std::numeric_limits<u64>::max()) == 0xe4d971771b652c20ULL);
+}
+
+void test_random() {
+    cp::rng.seed(5489);
+    assert(cp::rng() == 14514284786278117030ULL);
+    assert(cp::rand(INT_MIN, INT_MIN) == INT_MIN);
+    assert(cp::rand(LLONG_MAX, LLONG_MAX) == LLONG_MAX);
+    const u64 max = std::numeric_limits<u64>::max();
+    assert(cp::rand(max, max) == max);
+    const int negative = cp::rand(-9, -2);
+    assert(-9 <= negative && negative <= -2);
+    const i64 wide = cp::rand(-4000000000000LL, 4000000000000LL);
+    assert(-4000000000000LL <= wide && wide <= 4000000000000LL);
+    const u64 large = cp::rand(u64{1} << 63U, max);
+    assert(large >= (u64{1} << 63U));
+}
+
 void test_primality() {
     assert(!cp::is_prime(-7));
     assert(!cp::is_prime(0));
@@ -73,11 +124,25 @@ void test_primality() {
     assert(cp::is_prime(18446744073709551557ULL));
 }
 
+void test_pow() {
+    static_assert(std::is_same_v<decltype(cp::pow<1000000007>(1, 1)), u32>);
+    assert(cp::pow<1000000007>(2, 0) == 1);
+    assert(cp::pow<1000000007>(2, 10) == 1024);
+    assert(cp::pow<998244353>(998244354, 3) == 1);
+    assert(cp::inv<1000000007>(2) == 500000004);
+    assert(cp::inv<998244353>(3) == 332748118);
+}
+
 void test_pollard_rho() {
     assert(cp::factorize(0).empty());
     assert(cp::factorize(1).empty());
     assert((cp::factorize(360) == std::vector<u64>{2, 2, 2, 3, 3, 5}));
     assert(cp::factorize(1ULL << 63U) == std::vector<u64>(63, 2));
+    assert(cp::factorize_pair(0).empty());
+    assert(cp::factorize_pair(1).empty());
+    assert((cp::factorize_pair(360) ==
+            std::vector<std::pair<u64, int>>{{2, 3}, {3, 2}, {5, 1}}));
+    assert((cp::factorize_pair(1ULL << 63U) == std::vector<std::pair<u64, int>>{{2, 63}}));
 
     constexpr u64 first_prime = 1000000007ULL;
     constexpr u64 second_prime = 1000000009ULL;
@@ -119,6 +184,23 @@ void test_floor_sum() {
                          3999999999LL) == 7999999998000000000LL);
 }
 
+void test_ex_floor_sum() {
+    static_assert(std::is_same_v<decltype(cp::ex_floor_sum(1, 1, 1, 1)),
+                                 std::tuple<i128, i128, i128>>);
+    assert((cp::ex_floor_sum(0, 7, 3, 4) == std::tuple<i128, i128, i128>{0, 0, 0}));
+    assert((cp::ex_floor_sum(4, 10, 6, 3) == std::tuple<i128, i128, i128>{3, 8, 5}));
+    assert((cp::ex_floor_sum(5, 7, -3, 4) == std::tuple<i128, i128, i128>{-4, -13, 6}));
+    assert((cp::ex_floor_sum(3, 5, 2, -4) == std::tuple<i128, i128, i128>{-2, -1, 2}));
+    assert((cp::ex_floor_sum(5, 3, 8, 7) == std::tuple<i128, i128, i128>{37, 101, 347}));
+    assert((cp::ex_floor_sum(2000000, 2000000, 2000000, 0) ==
+            std::tuple<i128, i128, i128>{1999999000000LL, 2666664666667000000LL,
+                                         2666664666667000000LL}));
+    auto [s0, s1, s2] = cp::ex_floor_sum(100000, 1, 100000, 0);
+    assert(s0 == i128(499995000000000LL));
+    assert(s1 == i128(33332833335LL) * 1000000000LL);
+    assert(s2 == i128(33332833335LL) * 100000000000000LL);
+}
+
 void test_frac() {
     cp::frac<long long> a{6, -8}, b{5, 6};
     assert(a.num == -3 && a.den == 4);
@@ -146,6 +228,17 @@ void test_frac() {
     assert((cp::frac<i128>{big, 3} + cp::frac<i128>{big, 6} == cp::frac<i128>{big / 2}));
     assert((cp::frac<i128>{big, 3} < cp::frac<i128>{big + 1, 3}));
     assert((cp::frac<long long>{-2, 3} < cp::frac<long long>{-3, 5}));
+}
+
+void test_poly_mul() {
+    cp::poly::init();
+    cp::poly::init();
+    assert(cp::poly::poly_mul({}, {1, 2}).empty());
+    assert((cp::poly::poly_mul({7}, {9}) == std::vector<u32>{63}));
+    assert((cp::poly::poly_mul({1, 2, 3}, {4, 5, 6}) ==
+            std::vector<u32>{4, 13, 28, 27, 18}));
+    assert((cp::poly::poly_mul({998244352U, 1}, {1, 1}) ==
+            std::vector<u32>{998244352U, 0, 1}));
 }
 
 void test_rmq() {
@@ -198,6 +291,245 @@ void test_fenwick() {
     zeroes.add(3, 7);
     assert(zeroes.prefix_sum(3) == 0);
     assert(zeroes.prefix_sum(4) == 7);
+}
+
+void test_segment_tree() {
+    const std::vector<i64> values{3, -1, 4, 4, 5, -9, 2};
+    cp::SegmentTree tree(values);
+    assert(tree.size() == 7 && !tree.empty());
+    assert(tree.a == values);
+    assert(tree.query() == -9 && tree.query_index() == 5);
+    assert(tree.query(0, 7) == -9 && tree.query_index(0, 7) == 5);
+    assert(tree.query(0, 5) == -1 && tree.query_index(0, 5) == 1);
+    assert(tree.query(2, 4) == 4 && tree.query_index(2, 4) == 2);
+    assert(tree.query(6, 7) == 2 && tree.query_index(6, 7) == 6);
+
+    tree.set(5, 8);
+    assert(tree.a[5] == 8 && tree.query() == -1 && tree.query_index() == 1);
+    assert(tree.query(4, 7) == 2 && tree.query_index(4, 7) == 6);
+    tree.add(1, 10);
+    assert(tree.a[1] == 9 && tree.query() == 2 && tree.query_index() == 6);
+    tree.set(6, -5);
+    tree.set(3, -5);
+    assert(tree.query() == -5 && tree.query_index() == 3);
+    assert(tree.query(4, 7) == -5 && tree.query_index(4, 7) == 6);
+    tree.set(0, -5);
+    assert(tree.query_index() == 0);
+    assert(tree.query_index(1, 7) == 3);
+
+    cp::SegmentTree<int> zeroes(5);
+    assert(zeroes.query() == 0 && zeroes.query_index() == 0);
+    assert(zeroes.query_index(1, 5) == 1);
+    zeroes.add(4, -7);
+    assert(zeroes.query() == -7 && zeroes.query_index() == 4);
+    zeroes.set(4, 0);
+    assert(zeroes.query_index() == 0);
+
+    cp::SegmentTree filled(5, 7);
+    assert(filled.size() == 5 && filled.query() == 7 && filled.query_index() == 0);
+    assert(filled.query(3, 5) == 7 && filled.query_index(3, 5) == 3);
+    filled.set(4, -2);
+    assert(filled.query() == -2 && filled.query_index() == 4);
+    filled.add(4, 9);
+    assert(filled.query() == 7 && filled.query_index() == 0);
+
+    cp::SegmentTree<int> singleton{6};
+    singleton.set(0, -3);
+    singleton.add(0, 2);
+    assert(singleton.query() == -1 && singleton.query_index() == 0);
+    assert(singleton.query(0, 1) == -1 && singleton.query_index(0, 1) == 0);
+
+    cp::SegmentTree<int> extremes{INT_MAX, INT_MIN, INT_MAX};
+    assert(extremes.query() == INT_MIN && extremes.query_index() == 1);
+    assert(extremes.query(2, 3) == INT_MAX && extremes.query_index(2, 3) == 2);
+
+    const auto closer = [pivot = 10](int l, int r) {
+        const int a = l < pivot ? pivot - l : l - pivot;
+        const int b = r < pivot ? pivot - r : r - pivot;
+        return a < b;
+    };
+    cp::SegmentTree nearest(std::vector<int>{7, 13, 20, 9, 11}, closer);
+    assert(nearest.query() == 9 && nearest.query_index() == 3);
+    assert(nearest.query(1, 3) == 13 && nearest.query_index(1, 3) == 1);
+    nearest.set(0, 11);
+    assert(nearest.query() == 11 && nearest.query_index() == 0);
+    assert(nearest.query(1, 5) == 9 && nearest.query_index(1, 5) == 3);
+    nearest.add(3, 1);
+    assert(nearest.query() == 10 && nearest.query_index() == 3);
+    nearest.set(3, 30);
+    assert(nearest.query() == 11 && nearest.query_index() == 0);
+
+    cp::SegmentTree uniform_nearest(5, 13, closer);
+    assert(uniform_nearest.query() == 13 && uniform_nearest.query_index() == 0);
+    uniform_nearest.set(2, 9);
+    assert(uniform_nearest.query() == 9 && uniform_nearest.query_index() == 2);
+    uniform_nearest.add(2, 1);
+    assert(uniform_nearest.query() == 10 && uniform_nearest.query_index() == 2);
+
+    const auto decade_less = +[](const int& l, const int& r) { return l / 10 < r / 10; };
+    cp::SegmentTree<int, decltype(decade_less)> buckets({19, 11, 25}, decade_less);
+    assert(buckets.query() == 19 && buckets.query_index() == 0);
+    assert(buckets.query(1, 3) == 11 && buckets.query_index(1, 3) == 1);
+    buckets.set(2, 10);
+    assert(buckets.query_index() == 0);
+
+    cp::SegmentTree<std::string> words{"z", "a", "m"};
+    words.set(1, "zz");
+    assert(words.query() == "m" && words.query_index() == 2);
+    cp::SegmentTree filled_words(3, std::string("seed"));
+    assert(filled_words.query(1, 3) == "seed" && filled_words.query_index(1, 3) == 1);
+    filled_words.set(2, "apple");
+    assert(filled_words.query() == "apple" && filled_words.query_index() == 2);
+
+    cp::SegmentTree<int> empty;
+    cp::SegmentTree<int> empty_values(std::vector<int>{});
+    cp::SegmentTree<int> empty_filled(0, 7);
+    assert(empty.empty() && empty.size() == 0);
+    assert(empty_values.empty() && empty_values.size() == 0);
+    assert(empty_filled.empty() && empty_filled.size() == 0);
+}
+
+void test_max_flow() {
+    // 菱形网络（ACL 示例）
+    cp::MaxFlow<int> mf(4, 5);
+    assert(mf.add_edge(0, 1, 1) == 0);
+    assert(mf.add_edge(0, 2, 1) == 1);
+    assert(mf.add_edge(1, 3, 1) == 2);
+    assert(mf.add_edge(2, 3, 1) == 3);
+    assert(mf.add_edge(1, 2, 1) == 4);
+    assert(mf.flow(0, 3) == 2);
+    assert(mf.flow(0, 3) == 0);
+
+    const cp::MaxFlow<int>::FlowEdge e0 = mf.get_edge(0);
+    assert(e0.from == 0 && e0.to == 1 && e0.cap == 1 && e0.flow == 1);
+    const std::vector<cp::MaxFlow<int>::FlowEdge> all = mf.edges();
+    assert(all.size() == 5);
+    assert(all[1].from == 0 && all[1].to == 2 && all[1].cap == 1 && all[1].flow == 1);
+    assert(all[3].from == 2 && all[3].to == 3 && all[3].cap == 1 && all[3].flow == 1);
+    assert(all[4].from == 1 && all[4].to == 2 && all[4].cap == 1 && all[4].flow == 0);
+    assert((mf.min_cut(0) == std::vector<bool>{true, false, false, false}));
+    assert((mf.min_cut(3) == std::vector<bool>{true, true, true, true}));
+
+    // 限制最大流量
+    cp::MaxFlow<int> limited(4);
+    limited.add_edge(0, 1, 1);
+    limited.add_edge(0, 2, 1);
+    limited.add_edge(1, 3, 1);
+    limited.add_edge(2, 3, 1);
+    limited.add_edge(1, 2, 1);
+    assert(limited.flow(0, 3, 0) == 0);
+    assert(limited.flow(0, 3, 1) == 1);
+    assert(limited.flow(0, 3) == 1);
+
+    // 需要退流的网络（最大流为 3）
+    cp::MaxFlow<int> reroute(4);
+    reroute.add_edge(0, 1, 2);
+    reroute.add_edge(1, 2, 2);
+    reroute.add_edge(2, 3, 2);
+    reroute.add_edge(0, 2, 1);
+    reroute.add_edge(1, 3, 1);
+    assert(reroute.flow(0, 3) == 3);
+    assert((reroute.min_cut(0) == std::vector<bool>{true, false, false, false}));
+
+    // 混合网络（ACL 单元测试用例）
+    cp::MaxFlow<int> network(6);
+    network.add_edge(0, 1, 3);
+    network.add_edge(0, 2, 3);
+    network.add_edge(1, 2, 2);
+    network.add_edge(1, 3, 3);
+    network.add_edge(2, 4, 2);
+    network.add_edge(3, 4, 4);
+    network.add_edge(3, 5, 2);
+    network.add_edge(4, 5, 3);
+    assert(network.flow(0, 5) == 5);
+    const std::vector<bool> network_cut = network.min_cut(0);
+    assert(network_cut[0] && !network_cut[5]);
+    int network_cut_cap = 0;
+    for (const auto& e : network.edges())
+        if (network_cut[e.from] && !network_cut[e.to]) network_cut_cap += e.cap;
+    assert(network_cut_cap == 5);
+
+    // 长链网络（路径长度 99999，验证手工栈 DFS）
+    constexpr int kChain = 100000;
+    cp::MaxFlow<int> chain(kChain);
+    for (int i = 0; i < kChain - 1; ++i) chain.add_edge(i, i + 1, kChain);
+    assert(chain.flow(0, kChain - 1) == kChain);
+
+    // 不连通的点
+    cp::MaxFlow<int> disconnected(3);
+    disconnected.add_edge(0, 1, 7);
+    assert(disconnected.flow(1, 0) == 0);
+    assert(disconnected.flow(0, 2) == 0);
+    assert((disconnected.min_cut(0) == std::vector<bool>{true, true, false}));
+
+    // 修改边的容量与流量
+    cp::MaxFlow<int> dynamic(2);
+    dynamic.add_edge(0, 1, 5);
+    assert(dynamic.flow(0, 1) == 5);
+    dynamic.change_edge(0, 3, 1);
+    assert(dynamic.get_edge(0).cap == 3 && dynamic.get_edge(0).flow == 1);
+    assert(dynamic.flow(0, 1) == 2);
+    assert(dynamic.get_edge(0).cap == 3 && dynamic.get_edge(0).flow == 3);
+
+    // 自环不应破坏反向边索引
+    cp::MaxFlow<int> self_loop(2);
+    assert(self_loop.add_edge(0, 0, 7) == 0);
+    self_loop.change_edge(0, 5, 2);
+    assert(self_loop.get_edge(0).from == 0 && self_loop.get_edge(0).to == 0);
+    assert(self_loop.get_edge(0).cap == 5 && self_loop.get_edge(0).flow == 2);
+    self_loop.add_edge(0, 1, 4);
+    assert(self_loop.flow(0, 1) == 4);
+
+    // 浮点流量
+    cp::MaxFlow<double> real(3);
+    real.add_edge(0, 1, 1.5);
+    real.add_edge(1, 2, 0.5);
+    real.add_edge(0, 2, 2.0);
+    assert(real.flow(0, 2) == 2.5);
+
+    // 64 位大容量
+    cp::MaxFlow<i64> big(2);
+    big.add_edge(0, 1, 4000000000000LL);
+    assert(big.flow(0, 1) == 4000000000000LL);
+    assert(big.get_edge(0).flow == 4000000000000LL);
+}
+
+void test_min_cost_flow() {
+    cp::MinCostFlow<int, i64> mf(6, 8);
+    assert(mf.add_edge(0, 1, 1, 0) == 0);
+    assert(mf.add_edge(0, 2, 1, 0) == 1);
+    assert(mf.add_edge(1, 3, 1, 1) == 2);
+    assert(mf.add_edge(1, 4, 1, 3) == 3);
+    assert(mf.add_edge(2, 3, 1, 2) == 4);
+    assert(mf.add_edge(2, 4, 1, 100) == 5);
+    assert(mf.add_edge(3, 5, 1, 0) == 6);
+    assert(mf.add_edge(4, 5, 1, 0) == 7);
+    assert((mf.flow(0, 5, 0) == std::pair<int, i64>{0, 0}));
+    assert((mf.flow(0, 5, 1) == std::pair<int, i64>{1, 1}));
+    assert((mf.flow(0, 5) == std::pair<int, i64>{1, 4}));
+    assert((mf.flow(0, 5) == std::pair<int, i64>{0, 0}));
+    const auto rerouted = mf.get_edge(2);
+    assert(rerouted.from == 1 && rerouted.to == 3 && rerouted.cap == 1);
+    assert(rerouted.flow == 0 && rerouted.cost == 1);
+    const auto all = mf.edges();
+    assert(all[3].flow == 1 && all[4].flow == 1 && all[5].flow == 0);
+
+    cp::MinCostFlow<int, i64> negative(3);
+    negative.add_edge(0, 1, 1, -4);
+    negative.add_edge(1, 2, 1, 3);
+    negative.add_edge(0, 2, 1, 0);
+    assert((negative.flow(0, 2, 1) == std::pair<int, i64>{1, -1}));
+    assert((negative.flow(0, 2, 1) == std::pair<int, i64>{1, 0}));
+
+    cp::MinCostFlow<int, i64> disconnected(3);
+    disconnected.add_edge(0, 0, 2, 7);
+    disconnected.add_edge(0, 1, 3, 5);
+    assert((disconnected.flow(0, 2) == std::pair<int, i64>{0, 0}));
+    assert(disconnected.get_edge(0).flow == 0);
+
+    cp::MinCostFlow<i64, i64> big(2);
+    big.add_edge(0, 1, 1000000LL, 4000000000000LL);
+    assert((big.flow(0, 1) == std::pair<i64, i64>{1000000LL, 4000000000000000000LL}));
 }
 
 void test_p2() {
@@ -356,14 +688,23 @@ int main() {
     test_basic();
     test_debug();
     test_global_types();
+    test_splitmix64();
+    test_random();
     test_dsu();
+    test_ddsu();
     test_primality();
+    test_pow();
     test_pollard_rho();
     test_exgcd();
     test_floor_sum();
+    test_ex_floor_sum();
     test_frac();
+    test_poly_mul();
     test_rmq();
     test_fenwick();
+    test_segment_tree();
+    test_max_flow();
+    test_min_cost_flow();
     test_p2();
     test_p2r();
     test_convex_hull();

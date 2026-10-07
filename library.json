@@ -4,7 +4,7 @@
   "modules": {
     "types": {
       "header": "include/milmon/types.hpp",
-      "symbols": ["u32", "u64", "i32", "i64", "ll", "ull", "ld", "u128", "i128"],
+      "symbols": ["u32", "u64", "i32", "i64", "pii", "ll", "ull", "ld", "u128", "i128"],
       "depends": []
     },
     "basic": {
@@ -22,6 +22,11 @@
       "symbols": ["DSU"],
       "depends": []
     },
+    "ddsu": {
+      "header": "include/milmon/ds/ddsu.hpp",
+      "symbols": ["DDSU"],
+      "depends": []
+    },
     "fenwick": {
       "header": "include/milmon/ds/fenwick.hpp",
       "symbols": ["Fenwick"],
@@ -30,6 +35,21 @@
     "rmq": {
       "header": "include/milmon/ds/rmq.hpp",
       "symbols": ["RMQ"],
+      "depends": []
+    },
+    "segment_tree": {
+      "header": "include/milmon/ds/segment_tree.hpp",
+      "symbols": ["SegmentTree"],
+      "depends": []
+    },
+    "max_flow": {
+      "header": "include/milmon/graph/max_flow.hpp",
+      "symbols": ["MaxFlow"],
+      "depends": []
+    },
+    "min_cost_flow": {
+      "header": "include/milmon/graph/min_cost_flow.hpp",
+      "symbols": ["MinCostFlow"],
       "depends": []
     },
     "p2": {
@@ -77,6 +97,11 @@
       "symbols": ["exgcd"],
       "depends": []
     },
+    "ex_floor_sum": {
+      "header": "include/milmon/math/ex_floor_sum.hpp",
+      "symbols": ["ex_floor_sum"],
+      "depends": ["types"]
+    },
     "floor_sum": {
       "header": "include/milmon/math/floor_sum.hpp",
       "symbols": ["floor_sum"],
@@ -87,6 +112,26 @@
       "symbols": ["frac"],
       "depends": []
     },
+    "poly_mul": {
+      "header": "include/milmon/math/poly/poly_mul.hpp",
+      "symbols": ["poly", "poly_mul"],
+      "depends": ["types"]
+    },
+    "pow": {
+      "header": "include/milmon/math/pow.hpp",
+      "symbols": ["pow", "inv"],
+      "depends": ["types"]
+    },
+    "splitmix64": {
+      "header": "include/milmon/misc/splitmix64.hpp",
+      "symbols": ["splitmix64"],
+      "depends": ["types"]
+    },
+    "random": {
+      "header": "include/milmon/misc/random.hpp",
+      "symbols": ["rng", "rand"],
+      "depends": []
+    },
     "primality": {
       "header": "include/milmon/math/primality.hpp",
       "symbols": ["is_prime"],
@@ -94,8 +139,8 @@
     },
     "pollard_rho": {
       "header": "include/milmon/math/pollard_rho.hpp",
-      "symbols": ["pollard_rho", "factorize"],
-      "depends": ["primality"]
+      "symbols": ["pollard_rho", "factorize", "factorize_pair"],
+      "depends": ["primality", "splitmix64"]
     }
   }
 }

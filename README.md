@@ -42,18 +42,30 @@ include/milmon/
 ├── debug.hpp
 ├── ds/
 │   ├── dsu.hpp
+│   ├── ddsu.hpp
 │   ├── fenwick.hpp
-│   └── rmq.hpp
+│   ├── rmq.hpp
+│   └── segment_tree.hpp
 ├── geometry/
 │   ├── convex_hull.hpp
 │   ├── p2.hpp
 │   └── p2r.hpp
+├── graph/
+│   ├── max_flow.hpp
+│   └── min_cost_flow.hpp
 ├── math/
 │   ├── exgcd.hpp
+│   ├── ex_floor_sum.hpp
 │   ├── floor_sum.hpp
 │   ├── frac.hpp
+│   ├── poly/
+│   │   └── poly_mul.hpp
+│   ├── pow.hpp
 │   ├── primality.hpp
 │   └── pollard_rho.hpp
+├── misc/
+│   ├── random.hpp
+│   └── splitmix64.hpp
 └── string/
     ├── kmp.hpp
     ├── lyndon.hpp
@@ -62,7 +74,7 @@ include/milmon/
     └── z_function.hpp
 ```
 
-### 全局整数类型
+### 全局类型别名
 
 引入统一入口后，可以直接使用下列名称，无需添加 `cp::`：
 
@@ -71,6 +83,7 @@ u32 unsigned_32;
 u64 unsigned_64;
 i32 signed_32;
 i64 signed_64;
+pii integer_pair;
 ll signed_64_short;
 ull unsigned_64_short;
 ld real_extended;
@@ -78,7 +91,26 @@ u128 unsigned_128;
 i128 signed_128;
 ```
 
-其中 `u32/u64` 分别对应 `std::uint32_t/std::uint64_t`，`i32/i64` 分别对应 `int/long long`；`ll/ull` 分别是 `long long/u64` 的简写，`ld` 是 `long double` 的简写。
+其中 `u32/u64` 分别对应 `std::uint32_t/std::uint64_t`，`i32/i64` 分别对应 `int/long long`，`pii` 对应 `std::pair<int, int>`；`ll/ull` 分别是 `long long/u64` 的简写，`ld` 是 `long double` 的简写。展开器会识别这些别名，自动引入 `types` 模块。
+
+### SplitMix64
+
+```cpp
+u64 mixed = cp::splitmix64(value);
+```
+
+`misc/splitmix64.hpp` 提供无状态的 64 位整数混合函数：相同输入始终返回相同结果，不修改输入，支持 `constexpr` 求值。运算按模 `2^64` 自然回绕，可用于整数哈希；Pollard–Rho 的内部随机序列也复用此混合函数。
+
+### 随机数
+
+```cpp
+cp::rng.seed(12345);                 // 可选：显式指定种子
+auto raw = cp::rng();                // mt19937_64 原始输出
+int value = cp::rand(-5, 5);         // 闭区间 [-5, 5]
+i64 large = cp::rand<i64>(0, 1000000000000LL);
+```
+
+`misc/random.hpp` 提供 `inline std::mt19937_64 rng`，默认使用 `std::chrono::steady_clock` 的当前计数作为种子；多个翻译单元共享同一个引擎。`rand<T>(l, r)` 使用 `std::uniform_int_distribution<T>` 在闭区间 `[l, r]` 上均匀生成整数，支持标准库接受的有符号与无符号整数类型，要求 `l <= r`；省略模板参数时两端须为同一类型。引擎不是密码学随机源，并发访问需要调用方同步。
 
 ### 基础 I/O 设置
 
@@ -118,6 +150,18 @@ int component_size = dsu.size(a);
 
 实现只保存一个 `val` 数组：负数表示根，其绝对值为连通块大小；非负数表示父节点编号。合并采用按大小合并，并使用路径压缩，不额外维护连通块数量。
 
+### DDSU
+
+```cpp
+cp::DDSU dsu(n);
+bool merged = dsu.unite(a, b);
+int root = dsu.find(a);
+bool connected = dsu.same(a, b);
+dsu.reset(n);
+```
+
+头文件为 `<milmon/ds/ddsu.hpp>`。只保存父节点数组，初始时每个节点的父亲是自身，根满足 `parent[x] == x`，不使用 `-1` 标记。`unite(a, b)` 固定将 `b` 的根挂到 `a` 的根，不按大小合并；已经连通时返回 `false`。`find` 使用迭代式路径压缩，将查询路径上的节点直接挂到根，不使用递归。支持默认构造和 `reset(n)`，不维护连通块大小，也不提供 `size`。
+
 ### 快速素数判定
 
 ```cpp
@@ -143,6 +187,8 @@ i64 sum = cp::floor_sum(n, m, a, b);
 
 计算 `0 <= i < n` 时 `floor((a*i+b)/m)` 的总和，时间复杂度为 O(log m)。要求 `n >= 0`、`m > 0` 且答案能用 `i64` 表示；`a`、`b` 可以为负数。
 
+`ex_floor_sum(n, m, a, b)` 使用相同的参数约定，返回 `{sum(f_i), sum(i*f_i), sum(f_i*f_i)}` 组成的 `std::tuple<i128, i128, i128>`，其中 `f_i=floor((a*i+b)/m)`；要求三个结果都能用 `i128` 表示。
+
 ### 分数
 
 ```cpp
@@ -152,14 +198,33 @@ auto sum = a + b; // 5/6
 
 `frac<T>` 要求 `T` 为有符号整数类型，可以直接使用 `i128`。成员 `num`、`den` 分别表示分子和分母；构造后会自动约分并保证分母为正。支持四则运算、复合赋值、与整数混合运算和全部比较运算；`value()` 返回 `long double` 近似值。要求分母非零、除数非零，用户需要自行保证四则运算不溢出；对 `frac<i128>` 进行比较时，还需保证交叉相乘不会超出 `i128` 的表示范围。
 
+### 模幂与模逆
+
+```cpp
+u32 value = cp::pow<1000000007>(base, exponent);
+u32 inverse = cp::inv<1000000007>(value);
+```
+
+`pow<P>(x, y)` 计算 `x^y mod P`，`inv<P>(x)` 使用费马小定理计算乘法逆元。要求 `P` 为质数且 `x` 不被 `P` 整除。
+
+### 多项式乘法
+
+```cpp
+cp::poly::init();
+std::vector<u32> product = cp::poly::poly_mul(a, b);
+```
+
+系数按模数 `998244353` 计算，返回数组的长度为 `a.size()+b.size()-1`；任一输入为空时返回空数组。实现使用 NTT，时间复杂度为 O(n log n)，支持的变换长度最大为 `2^23`。`init()` 会预计算各级单位根，可以重复调用；`poly_mul()` 也会自动完成尚未进行的初始化。
+
 ### Pollard–Rho 分解
 
 ```cpp
 u64 divisor = cp::pollard_rho(n); // n 为合数时返回一个非平凡因子
 std::vector<u64> factors = cp::factorize(n); // 有序质因子，包含重数
+std::vector<std::pair<u64, int>> powers = cp::factorize_pair(n); // {质因子, 指数}
 ```
 
-`pollard_rho` 对质数返回其自身。`factorize` 对小于 2 的数返回空数组，其余情况结合确定性 Miller–Rabin 递归分解。实现采用 Brent 批量 GCD 版本的 Pollard–Rho。
+`pollard_rho` 对质数返回其自身。`factorize` 与 `factorize_pair` 对小于 2 的数返回空数组；后者的每项 `{p, c}` 表示 `p^c`。其余情况结合确定性 Miller–Rabin 递归分解。实现采用 Brent 批量 GCD 版本的 Pollard–Rho。
 
 ### RMQ
 
@@ -191,6 +256,70 @@ i64 prefix = sums.prefix_sum(right); // sum(values[0..right))
 ```cpp
 cp::Fenwick<i64> sums(values);
 ```
+
+### 线段树
+
+```cpp
+cp::SegmentTree<int> minimum({5, 2, 7, 1, 3});
+minimum.set(3, 8);                           // values[3] = 8
+minimum.add(1, 4);                           // values[1] += 4
+int answer = minimum.query(0, 4);            // 区间最小值 5
+std::size_t position = minimum.query_index(0, 4); // 位置 0
+int smallest = minimum.query();             // 全局最小值 3
+std::size_t smallest_position = minimum.query_index(); // 位置 4
+```
+
+与树状数组一样，支持默认空构造、按长度构造 `cp::SegmentTree<T>(n)`（元素初始化为 `T{}`）、从 `std::vector<T>` 或初始化列表构造，以及 `size()`、`empty()`。也支持 `cp::SegmentTree<T>(n, value)`，将所有位置初始化为同一个 `T` 值，例如 `cp::SegmentTree<int> filled(5, 7)` 创建五个值为 7 的元素。`set(i, value)` 单点赋值，`add(i, delta)` 单点累加；修改要求 `i < size()`，使用 `add` 时要求 `T` 支持 `+=`。
+
+查询接口与 RMQ 一致：下标为 0-based，区间为左闭右开 `[left, right)`，要求 `left < right <= size()`；无参查询要求非空。`query` 返回元素的 `const T&`，`query_index` 返回其原数组下标。
+
+底层数组 `std::vector<T> a` 为 public，可通过 `tree.a[i]` 访问当前元素。应通过 `set`/`add` 修改元素，并保持 `a` 的长度不变；直接写入 `a` 不会自动更新树节点。
+
+模板参数为 `SegmentTree<T, Compare = std::less<T>>`，各构造函数均支持将比较器作为最后一个参数传入：`(n, comp)`、`(n, value, comp)` 或 `(values, comp)`。默认求最小值；比较器须满足严格弱序，“第一个参数优于第二个参数时返回 `true`”。比较器判定等价的元素返回最左下标，不要求元素支持 `==` 或数值哨兵。例如按记录的第一项求最小值：
+
+```cpp
+auto cmp = [](const auto& l, const auto& r) { return l.first < r.first; };
+cp::SegmentTree records(std::vector<std::pair<int, int>>{{3, 10}, {1, 20}}, cmp);
+auto record = records.query(); // {1, 20}
+cp::SegmentTree repeated(5, std::pair<int, int>{3, 10}, cmp); // 五条相同记录
+```
+
+实现采用紧凑的 `2n` 非递归线段树，不补齐到二次幂；节点仅保存最优元素的下标。初始化 O(n)，单点修改和区间查询 O(log n)，全局查询 O(1)，空间 O(n)。线段树本身在修改和查询时不分配内存，查询不复制元素。
+
+### 最大流
+
+```cpp
+cp::MaxFlow<i64> mf(n);
+int id = mf.add_edge(from, to, cap); // 0-based，返回边的编号
+i64 max_flow = mf.flow(source, sink);
+i64 partial = mf.flow(source, sink, limit); // 最多只推 limit 流量
+std::vector<bool> side = mf.min_cut(source); // 残量网络上从 source 可达的点
+```
+
+`MaxFlow<Cap>(n, edge_hint)` 的第二个参数可选，省略时为 0；它会预留原始边与两倍残量边空间，已知边数时可减少建图期间的扩容。`Cap` 支持 `int`、`i64` 等整数，也支持 `double` 等浮点数。实现为 Dinic 算法，使用手工栈替代递归，时间复杂度为 O(V²E)；`flow(s, t)` 等价于 `flow(s, t, std::numeric_limits<Cap>::max())`，可以反复调用以增量推送流量。
+
+如需读取或修改每条边的状态：
+
+```cpp
+auto [from, to, cap, flow] = mf.get_edge(id);
+std::vector<cp::MaxFlow<i64>::FlowEdge> all = mf.edges();
+mf.change_edge(id, new_cap, new_flow); // 重置为「容量 new_cap、当前流量 new_flow」
+```
+
+`get_edge` 返回的 `cap` 为原始容量，`flow` 为当前流量；`change_edge` 可直接修改反向边上的流量。`add_edge`、`change_edge`、`get_edge` 与 `flow` 均带参数合法性断言。`min_cut` 返回的 `visited[v]` 为 `true` 当且仅当残量网络上存在 `source` 到 `v` 的边，可与最大流一起构成最小割。
+
+### 最小费用流
+
+```cpp
+cp::MinCostFlow<i64, i64> mcf(n, edge_hint);
+int id = mcf.add_edge(from, to, cap, cost); // 返回 0-based 边编号
+auto [flow, cost] = mcf.flow(source, sink, limit);
+auto [remaining, extra_cost] = mcf.flow(source, sink); // 继续推送剩余流量
+auto [u, v, capacity, used, unit_cost] = mcf.get_edge(id);
+auto all = mcf.edges();
+```
+
+`Cap` 与 `Cost` 分别为整数容量与有符号整数单位费用；支持负费用边。`flow` 返回本次调用实际推送的流量及其增量费用，无法达到 `limit` 时只返回可推送部分；省略 `limit` 时尽可能多推送。`get_edge` 的 `cap` 是原始容量，`flow` 是当前流量。求流时要求从源点可达的残量网络没有负费用环，且费用计算（包括中间距离、势能和总费用）与容量转换均在 `Cost` 范围内。实现采用首次 Bellman–Ford 初始化势能（仅有负残量边时）和逐次最短路 Dijkstra；重复调用会重新计算势能，以处理反向边上的负费用。
 
 ### 二维几何
 
