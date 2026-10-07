@@ -469,3 +469,5 @@ make test
 ```
 
 测试会检查所有模块，并验证模块依赖、目录内直接引入，以及生成的提交源码在没有 `-Iinclude` 的情况下仍可独立编译和运行。
+
+每次 push 时，GitHub Actions 会运行 `make test`。
